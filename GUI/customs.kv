@@ -1,0 +1,1066 @@
+#:kivy 2.0.0
+
+#:import Gradient GUI.Graphics.Gradient
+
+
+#:set res "resources/icon/"
+<AssignmentChip>:
+    icon: 'account'
+
+<AddChipField>:
+    size_hint_y: None
+    height: self.minimum_height
+
+    MDTextField:
+        id: field
+        hint_text: 'Name'
+
+<ChipList>:
+    StackLayout:
+        id: content
+        size_hint_y: None
+        height: self.minimum_height
+        padding: sp(3)
+        spacing: sp(6)
+    MDIconButton:
+        icon: 'plus'
+        on_release: root.open_add_dialog()
+
+<TaskItem>:
+    gradient_colors: [(0.4, 1., 0., 1), (1., 0.4, 0., 1)]
+    size_hint: 1, None
+    height: content_layout.height
+
+    BoxLayout:
+        id: content_layout
+        orientation: 'vertical'
+        spacing: sp(6)
+        size_hint: 1, None
+        height: self.minimum_height
+
+        ComponentBar:
+            bar_margin: 0
+            icon: res+'task.png'
+            text: root.task.name if root.task else ''
+            font_size: 32
+            icon_size: 32, 32
+
+            gradient_colors: root.gradient_colors
+        
+        ChipList:
+            id: assignments_list
+            size_hint: 1, None
+            height: self.minimum_height
+            task: root.task
+
+        MDProgressBar:
+            value: root.task.get_progression() if root.task else 0
+            color: app.theme_cls.accent_color
+            size_hint: 0.95, None
+            height: 12
+            pos_hint: {'center_x': 0.5}
+
+    
+<Backlog>: 
+    orientation: 'vertical'
+    border_width: 4
+
+    BoxLayout:
+        size_hint_y: None
+        height: self.minimum_height
+        padding: sp(6)
+        spacing: sp(6)
+        
+        MDLabel: 
+            text: 'To do'
+            size_hint: (1/3, None)
+            halign: 'center'
+            valign: 'center'
+            height: 32
+            font_style: 'H6'
+            pos_hint: {'center_y': 0.5}
+
+        MDLabel: 
+            text: 'Pending'
+            size_hint: (1/3, None)
+            height: 32
+            halign: 'center'
+            valign: 'center'
+            font_style: 'H6'
+            pos_hint: {'center_y': 0.5}
+
+        MDLabel: 
+            text: 'Done'
+            size_hint: (1/3, None)
+            height: 32
+            halign: 'center'
+            valign: 'center'
+            font_style: 'H6'
+            pos_hint: {'center_y': 0.5}
+
+    BoxLayout:
+        padding: sp(6)
+        spacing: sp(6)
+
+        ScrollView:
+            id: to_do_view
+            size_hint: 1/3, 1
+            pos_hint: {'center_y': 0.5}
+
+            canvas.before:
+                Color:
+                    rgb: 0.2, 0.2, 0.2
+                RoundedRectangle:
+                    pos: self.pos
+                    size: self.size
+                    radius: [14, ]
+
+                Color:
+                    rgba: app.theme_cls.bg_normal
+                RoundedRectangle:
+                    pos: self.x+root.border_width/2, self.y+root.border_width/2
+                    size: self.width-root.border_width, self.height-root.border_width
+                    radius: [14, ]
+
+            BoxLayout:
+                id: to_do_layout
+                orientation: 'vertical'
+                size_hint_y: None
+                height: self.minimum_height
+                padding: sp(12)
+                spacing: sp(4)
+
+        ScrollView:
+            id: pending_view
+            size_hint: 1/3, 1
+            pos_hint: {'center_y': 0.5}
+
+            canvas.before:
+                Color:
+                    rgb: 0.2, 0.2, 0.2
+                RoundedRectangle:
+                    pos: self.pos
+                    size: self.size
+                    radius: [14, ]
+
+                Color:
+                    rgba: app.theme_cls.bg_normal
+                RoundedRectangle:
+                    pos: self.x+root.border_width/2, self.y+root.border_width/2
+                    size: self.width-root.border_width, self.height-root.border_width
+                    radius: [14, ]
+
+            BoxLayout:
+                id: pending_layout
+                orientation: 'vertical'
+                size_hint_y: None
+                height: self.minimum_height
+                padding: sp(12)
+                spacing: sp(4)
+
+        ScrollView:
+            id: done_view
+            size_hint: 1/3, 1
+            pos_hint: {'center_y': 0.5}
+
+            canvas.before:
+                Color:
+                    rgb: 0.2, 0.2, 0.2
+                RoundedRectangle:
+                    pos: self.pos
+                    size: self.size
+                    radius: [14, ]
+
+                Color:
+                    rgba: app.theme_cls.bg_normal
+                RoundedRectangle:
+                    pos: self.x+root.border_width/2, self.y+root.border_width/2
+                    size: self.width-root.border_width, self.height-root.border_width
+                    radius: [14, ]
+
+            BoxLayout:
+                id: done_layout
+                orientation: 'vertical'
+                size_hint_y: None
+                height: self.minimum_height
+                padding: sp(12)
+                spacing: sp(4)
+
+
+<StateIcon>:
+    canvas:
+        Color:
+            rgb: self.color
+        Ellipse:
+            size: self.size
+    canvas.after:
+        Color:
+            rgb: (0.0, 0.0, 0.0)
+        Line:
+            width: 2
+            ellipse: (root.x, root.y, root.width, root.height)
+
+<TimeCursor>:
+    arrow_width: sp(12)
+    margin: sp(6)
+    x: self.x_offset + self.cursor_position * self.x_step
+    canvas.after:
+        Color:
+            rgb: (0.0, 0.0, 0.0)
+        Triangle:
+            points: [self.center_x, self.y + self.height - self.arrow_width, self.center_x + self.arrow_width, self.y + self.height, self.center_x - self.arrow_width, self.y + self.height]
+        Triangle:
+            points: [self.center_x, self.y + self.arrow_width, self.center_x + self.arrow_width, self.y, self.center_x - self.arrow_width, self.y]
+        
+
+<Tooltip>:
+    size_hint: None, None
+    size: self.texture_size[0]+5, self.texture_size[1]+5
+    canvas.before:
+        Color:
+            rgb: 0.2, 0.2, 0.2
+        Rectangle:
+            size: self.size
+            pos: self.pos
+
+<ComponentBar>:
+    bar_margin: 0
+    margin: dp(5)
+    icon: res+'message_bubble.png'
+    text: "Component"
+    font_size: 48
+    icon_size: 56, 56
+
+    size_hint: None, None
+    size: component_icon.width+component_label.width+6*root.margin+root.bar_margin, component_icon.height+2*root.margin 
+    
+    Image:
+        id: component_icon
+        source: root.icon
+        size_hint: None, None
+        size: root.icon_size
+
+        pos: root.margin, root.height-self.height-root.margin
+
+    Label:
+        id: component_label
+        text: root.text
+        color: app.theme_cls.text_color
+        valign: "center"
+        font_size: root.font_size
+
+        size_hint: None, None
+        size: self.texture_size
+        
+        pos: component_icon.width+2*root.margin, component_icon.y
+
+        canvas:
+            Color:
+                rgba: app.theme_cls.primary_color
+            Line:
+                width: 1.1
+                points: (self.x, self.y, self.x+self.width, self.y)
+
+<SwitchComponentBar>:
+    bar_margin: 0
+    margin: dp(5)
+    icon: res+'message_bubble.png'
+    text: "Component"
+    chip_callback_on: lambda x: x
+    chip_callback_off: lambda x: x
+    selected_button: 'on'
+    switch_size: 100, 30
+
+    size_hint: None, None
+    size: component_icon.width+component_label.width+comp_switch.width+6*root.margin+root.bar_margin, component_icon.height+2*root.margin 
+    
+    Image:
+        id: component_icon
+        source: root.icon
+        size_hint: None, None
+        size: 56, 56
+
+        pos: root.margin, root.height-self.height-root.margin
+
+    Label:
+        id: component_label
+        text: root.text
+        color: app.theme_cls.text_color
+        valign: "center"
+        font_size: 48
+
+        size_hint: None, None
+        size: self.texture_size
+        
+        pos: component_icon.width+2*root.margin, component_icon.y
+
+        canvas:
+            Color:
+                rgba: app.theme_cls.primary_color
+            Line:
+                width: 1.1
+                points: (self.x, self.y, self.x+self.width, self.y)
+
+    CustomSwitch:
+        id: comp_switch
+        selected: root.selected_button
+
+        size_hint: None, None
+        size: root.switch_size
+        x: root.width-self.width-root.margin
+        pos_hint: {'center_y': 0.5}
+
+        gradient_colors: [(0.4, 1., 0., 1), (1., 0.4, 0., 1)]
+
+        SwitchBase:
+            id: on_comp_switch
+            text: 'on'
+            font_size: 18
+            selected_color: (0.1, 0.7, 0, 1)
+            callback: root.chip_callback_on
+            
+        
+        SwitchBase:
+            text: 'off'
+            font_size: 18
+            selected_color: (0.7, 0.1, 0, 1)
+            callback: root.chip_callback_off
+
+        SwitchCursor:
+            font_size: 18
+            anim_duration: 0.6   
+
+<Component>:
+    bar_margin: 0
+    margin: dp(10)
+    text: 'Component'
+    orientation: 'vertical'
+    gradient_colors: []
+    chip_callback_off: lambda x: x
+    chip_callback_on: lambda x: x
+    selected_button: 'on'
+
+    pos: root.pos
+    size_hint: None, None
+    size: self.minimum_size
+
+    drag_rectangle: self.x, self.y, self.width, self.height
+
+    canvas:
+        Color:
+            rgb: (0.3, 0., 0.6)
+        Line:
+            width: 2
+            rectangle: (self.x, self.y, self.width, self.height)
+
+    
+
+<Task>:
+    text: 'Task'
+    name: name_text_field.text
+    chip_callback_on: self.callback_on
+    chip_callback_off: self.callback_off
+    selected_button: 'on' if self.activated else 'off'
+    icon: 'task.png'
+    bar_height: bar.height
+
+    canvas:
+        Color:
+            rgb: (1., 1., 1.)
+        Rectangle:
+            pos: self.x, self.y
+            size: (self.width, self.height-self.bar_height)
+            texture: Gradient.horizontal((0.6, 0.6, 0.5, 0.5), (0.3, 0.3, 0.3, 0.5))
+
+    GradientSwitchComponentBar:
+        id: bar
+        bar_margin: root.bar_margin
+        icon: res+root.icon
+        text: root.text
+        switch_size: 100, 30
+        chip_callback_on: root.chip_callback_on
+        chip_callback_off: root.chip_callback_off
+        selected_button: root.selected_button
+
+        gradient_colors: root.gradient_colors
+
+    LabeledTextField:
+        id: name_text_field
+        label_text: 'Name:'
+        input_text: root.name
+        hint_text: 'text'
+        bg_color: app.theme_cls.primary_color
+        
+        size_hint_x: 0.9
+        pos_hint: {'center_x': 0.5}
+        
+    LabeledTextField:
+        id: resource_text_field
+        label_text: 'Resource:'
+        input_text: str(root.resource)
+        hint_text: 'integer'
+        bg_color: app.theme_cls.primary_color
+        input_filter: 'int'
+
+        disabled: root.state == 'done' or root.fixed
+        
+        size_hint_x: 0.9
+        pos_hint: {'center_x': 0.5}
+    
+    BoxLayout:
+        id: duration_layout
+        size_hint: 0.9, None
+        height: duration_text_field.height
+        pos_hint: {'center_x': 0.5}
+        
+        LabeledTextField:
+            id: duration_text_field
+            label_text: 'Duration:'
+            input_text: str(int(root.get_duration(root.unit))) if app.manager.planning is not None else str(root.duration)
+            hint_text: 'integer'
+            bg_color: app.theme_cls.primary_color
+            input_filter: 'int'
+
+            disabled: root.state == 'done' or root.fixed
+
+            size_hint_x: None
+            width: duration_layout.width - unit_switch.width 
+
+        CustomSwitch:
+            id: unit_switch
+            selected: root.unit
+            disabled: True if root.fixed or root.state == "done" else False
+
+            size_hint: None, None
+            size: 90, 30
+            pos_hint: {'center_y': 0.5}
+
+            gradient_colors: [(0.0, 0.7, 0.4, 0.6), (0.0, 0.2, 0.7, 0.6)]
+
+            SwitchBase:
+                id: day_unit_switch
+                text: 'day'
+                font_size: 14
+                selected_color: (0.0, 0.7, 0.4, 0.6)
+                callback: lambda x: root.set_unit('day')
+                
+            SwitchBase:
+                text: 'hour'
+                font_size: 14
+                selected_color: (0.0, 0.2, 0.7, 0.6)
+                callback: lambda x: root.set_unit('hour')
+
+            SwitchCursor:
+                font_size: 14
+                anim_duration: 0.6   
+        
+    LabeledTextField:
+        id: max_end_day_text_field
+        label_text: 'Max end day:'
+        input_text: str(root.max_end_day) if root.max_end_day else ""
+        hint_text: 'integer'
+        bg_color: app.theme_cls.primary_color
+        input_filter: 'int'
+        
+        disabled: root.state == 'done' or root.fixed
+
+        size_hint_x: 0.9
+        pos_hint: {'center_x': 0.5}
+
+<DialogSheetView>:
+    radius: [14, 14, 14, 14]
+    auto_dismiss: False
+
+    RelativeLayout: 
+        id: sheet_layout
+        orientation: 'vertical'
+        size_hint: (0.95, None)
+        height: root.height - sp(16)
+
+        MDLabel: 
+            id: title
+            text: root.title
+            size_hint: (1, None)
+            height: 32
+            font_style: 'H6'
+            pos_hint: {'top': 1, 'left': 0}
+
+        RelativeLayout: 
+            id: content_layout
+            size_hint: (1, None)
+            height: sheet_layout.height-buttons_layout.height-title.height
+            y: buttons_layout.y+buttons_layout.height
+
+        FloatLayout: 
+            id: buttons_layout
+            size_hint: (1, None)
+            height: validate_btn.height
+
+            MDFlatButton:
+                id: validate_btn 
+                text: "OK"
+                text_color: app.theme_cls.primary_color
+                pos_hint: {'right': 1}
+            MDFlatButton:
+                id: cancel_btn
+                text: "CANCEL"
+                text_color: app.theme_cls.primary_color
+                pos: (validate_btn.x-validate_btn.width, validate_btn.y)
+<TaskTreatmentDialog>:
+    orientation: "vertical"
+    padding: sp(6)
+    spacing: sp(6)
+
+    BoxLayout:
+        orientation: 'horizontal'
+        MDRectangleFlatButton:
+            id: done_button
+            text: "Done/Undone"
+            size_hint: (0.5, None)
+        MDRectangleFlatButton:
+            id: fix_button
+            text: "Fix/Unfix"
+            size_hint: (0.5, None)
+
+    BoxLayout:
+        MDTextField:
+            id: prolongation_field
+            disabled: root.task.fixed or root.task.state == "done"
+            hint_text: "Prolongation"
+
+        CustomSwitch:
+            id: unit_switch
+            selected: root.task.unit
+            disabled: root.task.fixed or root.task.state == "done" 
+
+            size_hint: None, None
+            size: 90, 30
+            pos_hint: {'center_y': 0.5}
+
+            gradient_colors: [(0.0, 0.7, 0.4, 0.6), (0.0, 0.2, 0.7, 0.6)]
+
+            SwitchBase:
+                id: day_unit_switch
+                text: 'day'
+                font_size: 14
+                selected_color: (0.0, 0.7, 0.4, 0.6)
+                callback: lambda x: root.set_unit('day')
+                
+            SwitchBase:
+                text: 'hour'
+                font_size: 14
+                selected_color: (0.0, 0.2, 0.7, 0.6)
+                callback: lambda x: root.set_unit('hour')
+
+            SwitchCursor:
+                font_size: 14
+                anim_duration: 0.6   
+
+<CreateProjectDialogContent>:
+    orientation: 'vertical'
+
+    MDTextField:
+        id: name_field
+        hint_text: 'Name'
+
+    MDTextField:
+        id: capacity_field
+        hint_text: 'Capacity'
+        input_filter: 'int'
+
+    MDTextField:
+        id: day_duration_field
+        hint_text: 'Day duration'
+        input_filter: 'int'
+<DuplicateProjectDialogContent>:
+    MDTextField:
+        id: name_field
+        hint_text: 'Name'
+        
+<StartTask>:
+    text: 'Start'
+    gradient_colors: [(0.8, 0., 0., 0.5), (0.2, 0.2, 0.7, 0.5)]
+    icon: 'task.png'
+
+    GradientComponentBar:
+        bar_margin: root.bar_margin
+        icon: res+root.icon
+        text: root.text
+
+        gradient_colors: root.gradient_colors
+
+<EndTask>:
+    text: 'End'
+    gradient_colors: [(0.8, 0., 0., 0.5), (0.2, 0.2, 0.7, 0.5)]
+    icon: 'task.png'
+
+    GradientComponentBar:
+        bar_margin: root.bar_margin
+        icon: res+root.icon
+        text: root.text
+
+        gradient_colors: root.gradient_colors
+
+<ScrollablePlanning>:
+    chunk_size: 52
+    margin: 6
+    tasks_width: entries.width
+    
+    BoxLayout:
+        id: entries
+        size_hint: None, None
+        size: self.minimum_size[0], 2*(root.chunk_size-root.margin)
+        pos_hint: {'x': 0, 'top': 1}
+        padding: root.margin
+        spacing: root.margin
+
+        canvas.before:
+            Color:
+                rgba: app.theme_cls.bg_normal
+            Rectangle:
+                pos: self.pos
+                size: self.size
+
+        canvas.after:
+            Color:
+                rgb: (0.0, 0.0, 0.0)
+            Line:
+                width: 3
+                points: [self.width, self.y+self.height, self.width, 0]
+            
+            Line:
+                width: 3
+                points: [0, self.y, self.width, self.y] 
+                
+        StateIcon:
+            id: state_icon
+            size_hint: None, None
+            size: 32, 32
+            states: ['up_to_date', 'unsolvable', 'waiting_for_treatment', 'to_validate']
+            colors: [(0.1, 0.8, 0.1), (0.8, 0.1, 0.1), (1.0, 0.5, 0.1), (0.9,0.9,0.0)]
+            tooltip_txts: ['All is up to date', 'The problem seems to be unsolvable', 'There is some tasks needing treatment', 'The current planning has to be validated']
+            pos_hint: {'center_y': 0.5}
+
+        Label:
+            text: 'Tasks\Time'
+            color: 0.0, 0.0, 0.0
+            size_hint: (None, None)
+            size: (self.texture_size[0], 2*(root.chunk_size-root.margin))
+
+            pos_hint: {'center_y': 0.5}
+
+        CustomSwitch:
+            id: unit_switch
+            selected: root.planning_unit
+
+            size_hint: None, None
+            size: 120, 30
+            pos_hint: {'center_y': 0.5}
+
+            gradient_colors: [(0.0, 0.7, 0.4, 0.6), (0.0, 0.2, 0.7, 0.6)]
+
+            SwitchBase:
+                id: day_unit_switch
+                text: 'day'
+                font_size: 18
+                selected_color: (0.0, 0.7, 0.4, 0.6)
+                callback: lambda x: root.on_unit_switch('day')
+                
+            
+            SwitchBase:
+                text: 'hour'
+                font_size: 18
+                selected_color: (0.0, 0.2, 0.7, 0.6)
+                callback: lambda x: root.on_unit_switch('hour')
+
+            SwitchCursor:
+                font_size: 18
+                anim_duration: 0.6   
+
+    
+
+    ScrollView:
+        id: time_scrolling_view 
+        effect_cls: 'ScrollEffect'
+        do_scroll_x: True 
+        do_scroll_y: False 
+        scroll_x: planning_scrolling_view.scroll_x
+
+        size_hint: (None, None)
+        size: (root.width-root.tasks_width, 2*(root.chunk_size-root.margin))
+        x: root.tasks_width
+        pos_hint: {'top': 1}
+
+        BoxLayout:
+            id: time_layout
+            orientation: 'horizontal'
+            size_hint: (None, None)
+            size: (self.minimum_size[0], 2*(root.chunk_size-root.margin))
+            spacing: root.margin
+            padding: root.margin / 2
+
+            canvas.before:
+                Color:
+                    rgba: app.theme_cls.bg_normal
+                Rectangle:
+                    pos: self.pos
+                    size: self.size     
+            
+            canvas.after:
+                Color:
+                    rgb: (0.0, 0.0, 0.0)
+            
+                Line:
+                    width: 3
+                    points: [0, 0, self.width, 0] 
+
+    ScrollView:
+        id: tasks_scrolling_view 
+        effect_cls: 'ScrollEffect'
+        do_scroll_x: False 
+        do_scroll_y: True 
+        scroll_y: planning_scrolling_view.scroll_y
+
+        size_hint: (None, None)
+        size: (tasks_layout.width, root.height - 2*(root.chunk_size-root.margin))
+        top: root.height - 2*(root.chunk_size-root.margin)
+        pos_hint: {'left': 0}
+        
+        
+        BoxLayout:
+            id: tasks_layout
+            orientation: 'vertical'
+            size_hint: (None, None)
+            size: self.minimum_size
+
+            canvas.after:
+                Color:
+                    rgb: (0.0, 0.0, 0.0)
+                Line:
+                    width: 3
+                    points: [self.width, self.height, self.width, 0]
+                
+            canvas.before:
+                Color:
+                    rgba: app.theme_cls.bg_normal
+                Rectangle:
+                    pos: self.pos
+                    size: self.size
+
+
+    ScrollView:
+        id: planning_scrolling_view 
+        effect_cls: 'ScrollEffect'
+        do_scroll_x: True 
+        do_scroll_y: True 
+        scroll_x: time_scrolling_view.scroll_x
+        scroll_y: tasks_scrolling_view.scroll_y
+
+        size_hint: (None, None)
+        size: (root.width-tasks_scrolling_view.width, root.height-entries.height)
+        top: root.height-entries.height
+        x: tasks_scrolling_view.width
+
+        RelativeLayout:
+            id: planning_layout
+            size_hint: None, None
+            size: planning_grid.size
+
+            canvas.before:
+                Color:
+                    rgba: app.theme_cls.bg_normal
+                Rectangle:
+                    pos: self.pos
+                    size: self.size
+            
+            Grid: 
+                id: planning_grid
+                size_hint: (None, None)
+                square_size: root.chunk_size, root.tasks_height
+                line_width: 1
+                bold_line: False
+                size: (root.n_cols * self.square_width, root.n_rows * self.square_height)
+                pos_hint: {'left': 0, 'top': 1}               
+
+<TaskLabel>:
+    size_hint: (None, None)
+    orientation: 'horizontal'
+    spacing: sp(6)
+
+    canvas.after:
+        Color: 
+            rgb: 0.2, 0.2, 0.2
+        Line:
+            width: 1
+            points: [0, self.y, self.width, self.y]
+
+    BoxLayout:
+        padding: sp(6)
+        spacing: sp(6)
+        CircleIndex:
+            id: index
+            index: root.index
+            size: 32, 32
+            pos_hint: {"center_y": 0.5}
+
+        Label:
+            id: label
+            text: root.text
+            color: 0.0, 0.0, 0.0
+            valign: 'center'
+            text_size: root.width-index.width-sp(12), None
+            size: self.texture_size
+            pos_hint: {"top": 1}
+
+<HorizontalGradientRectangle>:
+    canvas.before:
+        Color:
+            rgb: (1., 1., 1.)
+        Rectangle:
+            size: self.size
+            texture: Gradient.horizontal(*self.gradient_colors)
+<VerticalGradientRectangle>:
+    canvas.before:
+        Color:
+            rgb: (1., 1., 1.)
+        Rectangle:
+            size: self.size
+            texture: Gradient.vertical(*self.gradient_colors)
+<TaskSpan>:
+    pos: self.cursor_position * (self.square_width / app.manager.get_day_duration()), (self.n-self.i) * self.square_height
+    size_hint: (None, None)
+    size: (self.square_width * root.spanning, self.square_height)
+    gradient_colors: [(0.8, 0., 0., 0.5), (0.2, 0.2, 0.8, 0.5)]
+
+    buttons_width: self.square_width
+    buttons_height: self.square_height
+    x_step: self.square_width / app.manager.get_day_duration()
+    do_center_button: True
+
+    SquareIndex:
+        index: str(root.task.get_consumed_resources())
+        text_color: (1.0, 1.0, 1.0, 1.0)
+        bg_color: (0.2, 0.2, 0.2, 0.8)
+        pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+
+<CircleIndex>:
+    index: '1'
+    size_hint: None, None
+    text_color: app.theme_cls.text_color
+    bg_color: app.theme_cls.primary_color
+
+    canvas.before:
+        Color:
+            rgba: root.bg_color
+        Line:
+            width: 1.5
+            ellipse: (root.x, root.y, root.width, root.height)
+
+    Label:
+        id: label
+        text: root.index
+        color: root.text_color
+
+        font_size: 22
+        size_hint: None, None
+        size: root.size
+        halign: 'center'
+        valign: 'center'
+
+        
+<SquareIndex>:
+    index: '1'
+    size_hint: None, None
+    size: self.minimum_size
+    text_color: app.theme_cls.text_color
+    bg_color: (0.0, 0.0, 0.0, 1.0)
+
+    Label:
+        id: label
+        text: root.index
+        color: root.text_color
+
+        font_size: 22
+        size_hint: None, None
+        size: max(*self.texture_size), max(*self.texture_size)
+        center: root.center
+
+        canvas.before:
+            Color:
+                rgba: root.bg_color
+            Rectangle:
+                pos: (root.x, root.y)
+                size: (root.width, root.height)
+<Link>:
+    size_hint: None, None
+   
+<ScrollingGridLayout>:
+    size_hint: 1, None
+    height: self.parent.height
+
+    scroll_lay: lay.__self__
+
+    MDGridLayout:
+        id: lay
+
+        adaptive_height: True
+
+        cols: 2
+        spacing: dp(12)
+        margin: dp(12)
+<RightBottomFloatingButton>:
+    x: self.parent.x + self.parent.width - self.width - self.margin if self.parent else 0
+    y: self.parent.y + self.margin if self.parent else 0
+<ProjectListItem>:
+    IconLeftWidget:
+        icon: 'clipboard-check-outline'
+    RightIconButton:
+        id: edit_button
+        icon: 'dots-vertical'
+<SheetView>:
+    overlay_color: 0.0, 0.0, 0.0, 0.0  # make it invisible 
+    background_color: 0.0, 0.0, 0.0, 0.0  # make it invisible 
+    canvas.before:
+        Color:
+            rgba: app.theme_cls.bg_light
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: root.radius
+<LabeledTextField@RelativeLayout>:
+    label_text: ''
+    input_text: ''
+    hint_text: ''
+    input_filter: None
+    size_hint_y: None 
+    margin: dp(4)
+    height: label.height+root.margin
+    bg_color: (1., 1., 1., 1)
+    text: input_text_filed.text
+
+    canvas:
+        Color:
+            rgba: root.bg_color
+        RoundedRectangle:
+            size: self.size
+            radius: [6, ]
+
+    Label:
+        id: label
+        text: root.label_text
+        color: app.theme_cls.text_color
+        valign: "center"
+        font_size: 22
+
+        size_hint: None, None
+        size: self.texture_size
+        x: root.margin
+        pos_hint: {'center_y': 0.5}
+        
+    TextInput:
+        id: input_text_filed
+        multiline: False 
+        input_filter: root.input_filter
+        background_color: (1., 1., 1., 0)
+        text: root.input_text
+        hint_text: root.hint_text
+        font_size: 22
+        
+        size_hint: None, None
+        size: root.width-label.width-4*root.margin, self.minimum_height
+        x: label.width+2*root.margin
+        pos_hint: {'center_y': 0.5}
+
+
+<RectangleIconLabelButton>:
+    orientation: 'vertical'
+    margin: sp(32)
+    canvas:
+        Color: 
+            rgba: root.frame_color
+
+        Line:
+            width: root.frame_width
+            rectangle: (self.x, self.y, self.width, self.height)
+
+    Image:
+        id: icon
+        source: root.source
+        size_hint: None, None
+        size: root.width-root.margin, root.height-root.margin
+
+        pos_hint: {'center_x': 0.5}
+
+    Label:
+        text: root.text
+        
+        color: app.theme_cls.text_color
+        valign: "center"
+
+        size_hint: None, None
+        size: self.texture_size
+        pos_hint: {'center_x': 0.5}
+        
+<SwitchBase>:
+    size_hint: None, None
+
+    canvas:
+        Color:
+            rgba: root.color 
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [12, ]
+    
+    BoxLayout:
+        size_hint_x: None
+        width: self.minimum_width
+        padding: dp(10)
+        Label:
+            id: sb_label
+            text: root.text
+            font_size: root.font_size
+            size_hint_x: None
+            width: self.texture_size[0]
+
+<SwitchCursor>:
+    size_hint: None, None
+    cursor_color: (0.4, 0.4, 0.4, 1.)
+    label_opacity: 1
+
+    canvas:
+        Color:
+            rgba: self.current_color 
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [12, ]
+
+    BoxLayout:
+        opacity: root.label_opacity
+
+        size_hint_x: None
+        width: self.minimum_width
+        padding: dp(10)
+        Label:
+            id: sc_label
+            text: root.text
+            font_size: root.font_size
+            size_hint_x: None
+            width: self.texture_size[0]
+    
+    
+
+<CustomSwitch>:
+    gradient_colors: []
+    canvas:
+        Color:
+            rgb: (1., 1., 1.)
+
+        RoundedRectangle:
+            size: self.size
+            texture: Gradient.horizontal(*self.gradient_colors)
+            radius: [15, ]
+
+    
+           

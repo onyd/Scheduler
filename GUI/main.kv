@@ -1,0 +1,96 @@
+#:kivy 2.0.0
+
+#:include GUI/customs.kv
+#:include GUI/editor.kv
+
+#:set res "resources/icon/"
+
+ScreenManager:
+    id: screen_manager
+
+    ProjectsListScreen:
+        id: projects_list_screen
+        name: 'projects_list_screen'
+
+        FloatLayout:
+            id: file_list_layout
+
+            ScrollView: 
+                id: file_scrollview
+
+                MDList:
+                    id: file_list
+
+            RightBottomFloatingButton:
+                id: new_file_btn
+                icon: 'plus'
+                md_bg_color: app.theme_cls.accent_color
+                elevation_normal: 8
+
+
+    ChooseEditorScreen:
+        id: choose_editor_screen
+        name: 'choose_editor_screen'
+
+        GridLayout:
+            id: select_editor
+            cols: 2
+            spacing: dp(12), dp(12)
+            padding: dp(8), dp(8)
+
+            RectangleIconLabelButton:
+                id: graph_btn
+                frame_color: app.theme_cls.primary_color
+
+                source: res+'pert.png'
+                text: "PERT chart"
+                on_release: app.change_screen('graph_editor_screen') 
+
+            RectangleIconLabelButton:
+                id: planning_btn
+                frame_color: app.theme_cls.primary_color
+                
+                source: res+'planning.png'
+                text: "Gantt chart"
+                on_release: app.change_screen('planning_screen')      
+
+            RectangleIconLabelButton:
+                id: burndown_btn
+                frame_color: app.theme_cls.primary_color
+                
+                source: res+'burndown.png'
+                text: "Burndown chart"
+                on_release: app.change_screen('burndown_screen')    
+
+            RectangleIconLabelButton:
+                id: backlog_screen_btn
+                frame_color: app.theme_cls.primary_color
+                
+                source: res+'backlog.png'
+                text: "Backlog"
+                on_release: app.change_screen('backlog_screen')         
+            
+    GraphEditorScreen:
+        id: graph_editor_screen
+        name: 'graph_editor_screen'
+
+    PlanningScreen:
+        id: planning_screen
+        name: 'planning_screen' 
+        scrollable_planning: planning 
+
+        ScrollablePlanning:
+            id: planning
+            
+    BurndownScreen:
+        id: burndown_screen
+        name: 'burndown_screen' 
+        burndown_chart: burndown_chart
+
+        BurndownChart:
+            id: burndown_chart
+
+    BacklogScreen:
+        id: backlog_screen
+        name: 'backlog_screen'
+
