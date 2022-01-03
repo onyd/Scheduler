@@ -1,13 +1,15 @@
+from dateutil import rrule
 from kivymd.uix.button import MDFlatButton
 from kivymd.uix.dialog import MDDialog
 from kivymd.uix.label import MDLabel
 from Core.PlanningData import PlanningData
 from GUI.Widgets import EndTask, StartTask
+from Utils.TaskTime import TaskDelta, TaskDate
 from Utils.DirectedGraph import DirectedGraph
 from GUI.Widgets import Link
 from Utils.FileManager import FileManager
 from kivymd.toast import toast
-from math import ceil
+import datetime
 
 
 class PlanningManager:
@@ -18,35 +20,30 @@ class PlanningManager:
         self.saved = True
         self.app = app
 
-    def get_horizons(self, unit="day"):
-        if unit == "hour":
-            return self.planning.horizons
-        else:
-            return [
-                horizon // self.get_day_duration()
-                for horizon in self.planning.horizons
-            ]
+        self.time_cuts = None
+        self.n_work_free_days_before_date = None
 
-    def get_horizon(self, unit="day", day=-1):
-        if unit == "day":
-            return self.planning.horizons[day] // self.get_day_duration()
-        else:
-            return self.planning.horizons[day]
+    def get_totals_hours(self):
+        return self.planning.totals_hours
 
-    def set_horizon(self, horizon, unit="day"):
-        day = self.get_current_time("day")
-        if day == len(self.get_horizons('day')):
-            if unit == "day":
-                self.planning.horizons.append(horizon *
-                                              self.get_day_duration())
-            elif unit == "hour":
-                self.planning.horizons.append(horizon)
+    def get_current_total_hours(self):
+        if self.get_totals_hours():
+            return self.get_totals_hours()[-1]
+        else:
+            return 0
+
+    def set_total_hours(self, total_hours):
+        day = self.date_to_index(
+            self.get_current_date()) // self.get_day_duration()
+
+        if day == len(self.get_totals_hours()):
+            self.planning.totals_hours.append(total_hours)
             return
 
-        # We have go back in planning time so we reset the computed horizons
-        while day < len(self.get_horizons('day')):
-            self.planning.horizons.pop()
-        self.set_horizon(horizon, unit)
+        # We have go back in planning time so we reset the computed totals_hours
+        while day < len(self.get_totals_hours()):
+            self.planning.totals_hours.pop()
+        self.set_total_hours(total_hours)
 
     def get_capacity(self):
         return self.planning.capacity
@@ -61,17 +58,41 @@ class PlanningManager:
                 tasks.append(task)
         return tasks
 
-    def get_current_time(self, unit="day"):
-        if unit == "day":
-            return self.planning.current_time
-        else:
-            return self.planning.current_time * self.get_day_duration()
+    def get_current_date(self):
+        return self.planning.current_date
 
-    def set_current_time(self, time):
-        self.planning.current_time = time
-        for task in self.get_tasks():
-            task.update_state(self.get_current_time())
+    def increase_current_date(self, delta):
+        self.planning.current_date += delta
         self.saved = False
+
+    def decrease_current_date(self, delta):
+        self.planning.current_date -= delta
+        self.saved = False
+
+    def set_current_date(self, date):
+        self.planning.current_date = date
+        self.saved = False
+
+    def update_task(self, *args):
+        for task in self.get_tasks():
+            task.update_state()
+
+    def update(self, *args):
+        self.time_cuts = [0]
+        self.n_work_free_days_before_date = {}
+
+        work_free_day_count = 0
+        for date in rrule.rrule(rrule.DAILY,
+                                dtstart=self.get_project_begin_date().date,
+                                until=self.get_project_end_date().date):
+            self.n_work_free_days_before_date[
+                date.date()] = work_free_day_count
+
+            if date.weekday() in self.get_week_days():
+                self.time_cuts.append(0)
+            else:
+                self.time_cuts[-1] += 1
+                work_free_day_count += 1
 
     def set_saved(self, saved):
         self.saved = saved
@@ -91,10 +112,44 @@ class PlanningManager:
     def set_day_duration(self, duration):
         self.planning.day_duration = duration
 
-    def get_planned_end_day(self):
+    def get_project_begin_date(self) -> TaskDate:
+        return self.planning.project_begin_date
+
+    def set_project_begin_date(self, date: TaskDate):
+        self.planning.project_begin_date = date
+
+    def get_project_end_date(self) -> TaskDate:
+        return self.planning.project_end_date
+
+    def set_project_end_date(self, date: TaskDate):
+        self.planning.project_end_date = date
+
+    def get_week_days(self):
+        return self.planning.week_days
+
+    def date_to_index(self, task_date: TaskDate) -> int:
+        """Return the index that represents the relative time in solver domain (ie in hour without the workfree days)"""
+        if task_date is not None:
+            delta = task_date - self.get_project_begin_date()
+            return delta.get_duration(
+                "hour") - self.n_work_free_days_before_date[
+                    task_date.date] * self.get_day_duration()
+        else:
+            return None
+
+    def index_to_date(self, index: int) -> TaskDate:
+        """Return the corresponding TaskDate object where index is the time in the solver domain (ie in hour without the workfree days)"""
+        date = self.get_project_begin_date()
+        delta = TaskDelta(
+            index +
+            sum(self.time_cuts[:index // self.get_day_duration() + 1]) *
+            self.get_day_duration())
+        return date + delta
+
+    def get_planned_end_date(self):
         for task in self.get_pert().V:
             if isinstance(task, EndTask):
-                return int(ceil(task.get_begin_time("day")))
+                return task.get_begin_date()
 
     def has_undone_anterior_tasks(self, to_check):
         pert_copy = self.planning.pert.copy()
@@ -107,7 +162,7 @@ class PlanningManager:
 
     def sort_tasks_by_begin_time(self):
         self.get_pert().sort_verticies(
-            key=lambda x: (x.get_begin_time('hour'), x.get_duration('hour')))
+            key=lambda x: (x.get_begin_date(), x.get_duration()))
         self.get_planning_screen().scrollable_planning.load()
         self.set_saved(False)
 
@@ -148,13 +203,17 @@ class PlanningManager:
                 self.links.remove(link)
                 return
 
-    def create(self, name, capacity, day_duration):
+    def create(self, name, capacity, day_duration, week_days):
         self.planning = PlanningData(
             name=name,
             pert=DirectedGraph([StartTask(pos=(0, 0)),
                                 EndTask(pos=(300, 0))]),
             capacity=capacity,
-            day_duration=day_duration)
+            day_duration=day_duration,
+            week_days=week_days,
+            project_begin_date=TaskDate.from_date(datetime.date.today(), 0),
+            project_end_date=TaskDate.from_date(datetime.date.today(), 0),
+            current_date=TaskDate.from_date(datetime.date.today(), 0))
         self.save()
 
     def get_planning_path(self, name=None, extension=".json"):
@@ -192,6 +251,10 @@ class PlanningManager:
         """Shortcut to load the graph:
             name: the graph name to load"""
         self.planning = PlanningData.load_planning_data(name, self.settings)
+        self.planning.bind(current_date=self.update_task,
+                           totals_hours=self.update)
+
+        self.update()
 
         def update_state(instance, value):
             self.get_planning_screen().update_icon_state(value)
@@ -203,6 +266,8 @@ class PlanningManager:
         self.planning = None
         self.links = []
         self.saved = True
+        self.n_work_free_days_before_date = None
+        self.time_cuts = None
 
     def reload(self):
         self.load(self.planning.name)

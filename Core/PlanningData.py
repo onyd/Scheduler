@@ -1,10 +1,11 @@
 from pathlib import Path
-
 from kivy.event import EventDispatcher
-from kivy.properties import StringProperty, NumericProperty, ListProperty
+from kivy.properties import StringProperty, ObjectProperty, ListProperty
+from Utils.TaskTime import TaskDate
 
-from GUI.Widgets import SerializableObject
+from Utils.XAbleObject import SerializableObject
 from Utils.FileManager import FileManager
+from Utils.DirectedGraph import DirectedGraph
 
 
 class PlanningData(SerializableObject, EventDispatcher):
@@ -12,24 +13,30 @@ class PlanningData(SerializableObject, EventDispatcher):
             name: allow to identify the planning_data graph
             graph: the DirectedGraph which represents the anteriority relations"""
     planning_state = StringProperty()
-    current_time = NumericProperty()
-    horizons = ListProperty()
+    current_date = ObjectProperty()
+    totals_hours = ListProperty()
 
     def __init__(self,
-                 name,
-                 pert,
-                 capacity,
-                 day_duration,
+                 name: str,
+                 pert: DirectedGraph,
+                 capacity: int,
+                 day_duration: int,
+                 week_days: list,
+                 project_begin_date: TaskDate,
+                 project_end_date: TaskDate,
+                 current_date: TaskDate,
                  planning_state="up_to_date",
-                 horizons=[],
-                 current_time=0):
+                 totals_hours=[]):
         self.name = name
         self.pert = pert
         self.planning_state = planning_state
         self.capacity = capacity
         self.day_duration = day_duration
-        self.horizons = horizons
-        self.current_time = current_time
+        self.totals_hours = totals_hours
+        self.current_date = current_date
+        self.project_begin_date = project_begin_date
+        self.project_end_date = project_end_date
+        self.week_days = week_days
 
     @staticmethod
     def get_planning_data_path_by_name(name, settings, extension=".json"):
@@ -44,8 +51,11 @@ class PlanningData(SerializableObject, EventDispatcher):
                                planning_state=self.planning_state,
                                capacity=self.capacity,
                                day_duration=self.day_duration,
-                               horizons=self.horizons,
-                               current_time=self.current_time)
+                               totals_hours=self.totals_hours,
+                               current_date=self.current_date,
+                               project_begin_date=self.project_begin_date,
+                               project_end_date=self.project_end_date,
+                               week_days=self.week_days)
 
     @classmethod
     def load_planning_data(cls, name, settings):

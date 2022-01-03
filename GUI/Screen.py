@@ -1,6 +1,5 @@
 from pathlib import Path
 import os
-import copy
 
 from kivy.uix.screenmanager import Screen
 
@@ -27,9 +26,14 @@ class ProjectsListScreen(Screen):
 
         def create_file(*args):
             sheetview.dismiss()
-            self.app.manager.create(content.ids.name_field.text,
-                                    int(content.ids.capacity_field.text),
-                                    int(content.ids.day_duration_field.text))
+            self.app.manager.create(
+                content.ids.name_field.text,
+                int(content.ids.capacity_field.text),
+                int(content.ids.day_duration_field.text), [
+                    i for i, day_chip in enumerate(
+                        content.ids.day_chips_layout.children)
+                    if day_chip.active
+                ])
             self.load_file_list()
 
         sheetview = DialogSheetView(title='Create new project',
@@ -37,7 +41,7 @@ class ProjectsListScreen(Screen):
                                     on_validate=create_file,
                                     on_cancel=lambda x: sheetview.dismiss(),
                                     size_hint=(None, None),
-                                    size=(500, 250))
+                                    size=(500, 320))
 
         sheetview.open()
 
@@ -77,13 +81,27 @@ class ChooseEditorScreen(Screen):
 
         self.app = MDApp.get_running_app()
 
+    def set_date(self, instance, value, date_range):
+        self.app.manager.set_project_begin_date(
+            TaskDate.from_date(date_range[0], 0))
+        self.app.manager.set_project_end_date(
+            TaskDate.from_date(date_range[-1], 0))
+        self.app.manager.save()
+
+    def open_date_picker(self, *args):
+        date_dialog = MDDatePicker(mode="range")
+        date_dialog.bind(on_save=self.set_date)
+        date_dialog.open()
+
     def on_pre_enter(self):
         def go_back(*args):
             self.app.manager.unload()
             self.app.manager.quit('projects_list_screen')
 
         self.app.tool_bar.left_action_items = [['arrow-left', go_back]]
-        self.app.tool_bar.right_action_items = []
+        self.app.tool_bar.right_action_items = [[
+            'calendar-range', self.open_date_picker
+        ]]
 
 
 class BacklogScreen(Screen):
@@ -169,20 +187,30 @@ class PlanningScreen(Screen):
                 fixed_begin_time.append(None)
                 end_task = v
             elif not isinstance(v, StartTask) and v.activated:
-                durations.append(v.get_duration('hour'))
+                durations.append(v.duration.get_duration('hour'))
                 consumed_resources.append(
                     v.get_consumed_resources() if v.state != "done" else 0)
                 tasks.append(v)
-                max_end_times.append(v.get_max_end_time('hour'))
+                max_end_times.append(
+                    self.app.manager.date_to_index(v.max_end_date))
                 if v.state == "done" or v.state == "progress" or v.fixed:
                     min_begin_times.append(None)
-                    fixed_begin_time.append(v.get_begin_time('hour'))
+                    fixed_begin_time.append(
+                        max(0, self.app.manager.date_to_index(v.begin_date)))
                 else:
                     min_begin_times.append(
-                        self.app.manager.get_current_time('hour'))
+                        self.app.manager.date_to_index(
+                            self.app.manager.get_current_date()))
                     fixed_begin_time.append(None)
             else:
                 pert_copy.remove_vertex(v)
+        self.app.manager.set_total_hours(sum(durations))
+        horizon = int(
+            (self.app.manager.get_project_end_date() +
+             TaskDelta.day(self.app.manager) -
+             self.app.manager.get_project_begin_date()).get_duration("hour")
+        ) - sum(
+            self.app.manager.time_cuts) * self.app.manager.get_day_duration()
 
         # Solve the linear problem
         solver = SchedulerSolver(
@@ -194,14 +222,16 @@ class PlanningScreen(Screen):
             max_end_times=max_end_times,
             durations=durations,
             consumed_resources=consumed_resources,
-            capacity=self.app.manager.get_capacity())
+            capacity=self.app.manager.get_capacity(),
+            horizon=horizon)
         if solver.solve():
             # Set general variables and save
             for i, task in enumerate(tasks):
-                task.set_begin_time(int(np.argmax(solver.solution[i], axis=0)),
-                                    'hour')
-            end_task.set_begin_time(solver.end_time, 'hour')
-            self.app.manager.set_horizon(solver.horizon, 'hour')
+                task.set_begin_date(
+                    self.app.manager.index_to_date(
+                        int(np.argmax(solver.solution[i], axis=0))))
+            end_task.set_begin_date(
+                self.app.manager.index_to_date(solver.end_time))
             self.app.manager.set_planning_state("up_to_date")
         else:
             self.app.manager.set_planning_state("unsolvable")
@@ -464,7 +494,7 @@ class GraphEditorScreen(Screen):
         self.ids.edit_area.to_center()
 
     def place_new_component(self):
-        component = Task(name="New", duration=1, resource=1)
+        component = Task(name="New", duration=TaskDelta(1), resource=1)
         self.add_component(component,
                            *self.ids.edit_area.to_local(*self.ids.view.center))
         self.place_mode_component(component)

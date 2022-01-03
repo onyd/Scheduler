@@ -1,3 +1,5 @@
+from copy import copy, deepcopy
+import enum
 from kivy.uix.textinput import TextInput
 from kivy.uix.widget import Widget
 from kivymd.toast.kivytoast.kivytoast import toast
@@ -5,6 +7,9 @@ from kivymd.uix.dialog import MDDialog
 from kivymd.uix.label import MDLabel
 import numpy as np
 from math import ceil
+import datetime
+from dateutil import rrule
+from numpy.lib.function_base import gradient
 from sklearn.linear_model import LinearRegression
 
 from kivy.metrics import sp, dp
@@ -18,7 +23,7 @@ from kivy.core.window import Window
 from kivy.uix.behaviors.button import ButtonBehavior
 from kivy.uix.scrollview import ScrollView
 from kivy.uix.label import Label
-from kivy.graphics import Color, Line, Triangle
+from kivy.graphics import Color, Line, Triangle, Rectangle
 from kivy.uix.modalview import ModalView
 
 from kivy.properties import (StringProperty, ColorProperty, NumericProperty,
@@ -29,7 +34,6 @@ from kivy.clock import Clock
 from kivy.animation import Animation
 from kivy.factory import Factory
 from kivy.compat import string_types
-from kivy.uix.recycleview.views import RecycleDataViewBehavior
 
 from kivymd.app import MDApp
 from kivymd.uix.behaviors import (
@@ -43,8 +47,10 @@ from kivymd.uix.list import (
     IRightBodyTouch,
     OneLineAvatarIconListItem,
 )
+from kivymd.uix.picker import MDDatePicker
 from kivymd.uix.chip import MDChip
 from kivymd.uix.menu import MDDropdownMenu
+from Utils.TaskTime import TaskDate, TaskDelta
 from kivy.garden.matplotlib.backend_kivyagg import FigureCanvasKivyAgg
 import matplotlib.pyplot as plt
 
@@ -177,56 +183,103 @@ class Grid(FloatLayout):
     square_height = NumericProperty(20)
     square_size = ReferenceListProperty(square_width, square_height)
     line_width = NumericProperty(1)
-    bold_line = BooleanProperty(True)
+    line_color = ColorProperty([0.6, 0.6, 0.6, 1.0])
+
+    bold_line_horizontal = BooleanProperty(True)
+    bold_line_vertical = BooleanProperty(True)
+    bold_step_horizontal = NumericProperty()
+    bold_step_vertical = NumericProperty()
     bold_width_multiplier = NumericProperty(2)
+    bold_color = ColorProperty([0.3, 0.3, 0.3, 1.0])
+
+    colored_rows = ListProperty()
+    rows_color = ColorProperty([0.7, 0.7, 0.7, 1.0])
+    colored_columns = ListProperty()
+    columns_color = ColorProperty([0.7, 0.7, 0.7, 1.0])
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.bind(size=self.draw_grid)
+        self.bind(size=self.draw_grid,
+                  square_size=self.draw_grid,
+                  line_width=self.draw_grid,
+                  line_color=self.draw_grid,
+                  bold_line_horizontal=self.draw_grid,
+                  bold_line_vertical=self.draw_grid,
+                  bold_step_horizontal=self.draw_grid,
+                  bold_step_vertical=self.draw_grid,
+                  bold_width_multiplier=self.draw_grid,
+                  bold_color=self.draw_grid,
+                  colored_rows=self.draw_grid,
+                  rows_color=self.draw_grid,
+                  colored_columns=self.draw_grid,
+                  columns_color=self.draw_grid)
 
     def draw_grid(self, *args):
-        self.canvas.before.clear()
-        with self.canvas.before:
+        try:
+            self.canvas.before.clear()
+            with self.canvas.before:
+                Color(rgba=self.rows_color)
+                for row in self.colored_rows:
+                    Rectangle(pos=(self.x,
+                                   self.height - row * self.square_height),
+                              size=(self.width, self.square_height))
+                Color(rgba=self.columns_color)
+                for column in self.colored_columns:
+                    Rectangle(pos=(column * self.square_width, self.y),
+                              size=(self.square_width, self.height))
 
-            Color(0.6, 0.6, 0.6, 1)
-            for i in range(0, int(self.width) + 1, int(self.square_width)):
-                # Vertical
-                Line(
-                    points=[
-                        self.x + i, self.y, self.x + i, self.y + self.height
-                    ],
-                    width=self.line_width,
-                )
-
-            for j in range(0, int(self.height) + 1, int(self.square_height)):
-                # Horizontal
-                Line(
-                    points=[
-                        self.x, self.y + j, self.x + self.width, self.y + j
-                    ],
-                    width=self.line_width,
-                )
-
-            # Bigger
-            if self.bold_line:
-                Color(0.3, 0.3, 0.3, 1)
-                for k in range(0, int(self.width) + 1, int(self.width / 3)):
+                Color(rgba=self.line_color)
+                for j in range(0, int(self.width) + 1, int(self.square_width)):
                     # Vertical
                     Line(
-                        width=self.bold_width_multiplier * self.line_width,
                         points=[
-                            self.x + k, self.y, self.x + k,
+                            self.x + j, self.y, self.x + j,
                             self.y + self.height
                         ],
+                        width=self.line_width,
                     )
-                for k in range(0, int(self.height) + 1, int(self.height / 3)):
+
+                for i in range(0,
+                               int(self.height) + 1, int(self.square_height)):
                     # Horizontal
                     Line(
-                        width=self.bold_width_multiplier * self.line_width,
                         points=[
-                            self.x, self.y + k, self.x + self.width, self.y + k
+                            self.x, self.y + i, self.x + self.width, self.y + i
                         ],
+                        width=self.line_width,
                     )
+
+                # Bigger
+                if self.bold_line_vertical:
+                    Color(rgba=self.bold_color)
+                    for k in range(
+                            0,
+                            int(self.width) + 1,
+                            int(self.bold_step_vertical * self.square_width)):
+                        # Vertical
+                        Line(
+                            width=self.bold_width_multiplier * self.line_width,
+                            points=[
+                                self.x + k, self.y, self.x + k,
+                                self.y + self.height
+                            ],
+                        )
+                if self.bold_line_horizontal:
+                    for k in range(
+                            0,
+                            int(self.height) + 1,
+                            int(self.bold_step_horizontal *
+                                self.square_height)):
+                        # Horizontal
+                        Line(
+                            width=self.bold_width_multiplier * self.line_width,
+                            points=[
+                                self.x, self.y + k, self.x + self.width,
+                                self.y + k
+                            ],
+                        )
+        except:
+            pass
 
 
 class Tooltip(Label):
@@ -295,13 +348,9 @@ class TaskTooltiped(Tooltipped):
     def update_tooltip(self, *args):
         self.tooltip_txt = ""
         self.tooltip_txt += "Name: " + self.task.name + "\n"
-        self.tooltip_txt += "Begin: " + str(
-            self.task.get_begin_day()) + " day" + "\n"
-        self.tooltip_txt += "End: " + str(
-            self.task.get_end_day()) + " day" + "\n"
-        self.tooltip_txt += "Duration: " + str(
-            round(self.task.get_duration(self.task.unit),
-                  2)) + " " + self.task.unit + "\n"
+        self.tooltip_txt += "Begin: " + str(self.task.begin_date) + "\n"
+        self.tooltip_txt += "End: " + str(self.task.get_end_date()) + "\n"
+        self.tooltip_txt += "Duration: " + str(self.task.duration) + "\n"
         self.tooltip_txt += "Description: \n" + self.task.description
 
 
@@ -422,13 +471,20 @@ class DialogSheetView(SheetView):
         self.ids.content_layout.add_widget(self.content)
 
 
+class CheckableChip(MDChip):
+    active = BooleanProperty()
+
+    def on_press(self):
+        self.active = not self.active
+        return super().on_press()
+
+
 class Task(Component):
     name = StringProperty("New")
+    begin_date = ObjectProperty()
+    duration = ObjectProperty()
     resource = NumericProperty(1)
-    duration = NumericProperty(1)
-    unit = StringProperty("hour")
-    begin_time = NumericProperty()
-    max_end_day = NumericProperty(allownone=True)
+    max_end_date = ObjectProperty()
     gradient_colors = ListProperty()
     description = StringProperty("")
     activated = BooleanProperty(True)
@@ -442,9 +498,8 @@ class Task(Component):
                  name,
                  duration,
                  resource,
-                 unit="hour",
-                 begin_time=-1,
-                 max_end_day=None,
+                 begin_date=TaskDate.from_date(datetime.date.today(), 0),
+                 max_end_date=None,
                  description="",
                  activated=True,
                  state="pending",
@@ -454,11 +509,9 @@ class Task(Component):
 
         self.name = name
         self.resource = resource
-        Clock.schedule_once(
-            lambda x: self.set_duration(duration, "hour", force=True))
-        self.unit = unit
-        self.begin_time = begin_time
-        self.max_end_day = max_end_day
+        Clock.schedule_once(lambda x: self.set_duration(duration, force=True))
+        self.begin_date = begin_date
+        self.max_end_date = max_end_date
         self.description = description
         self.activated = activated
         self.state = state
@@ -470,40 +523,64 @@ class Task(Component):
     def setup(self, *args):
         self.bind(activated=self.set_gradient_colors,
                   state=self.update_treatment,
-                  fixed=self.draw_fixed_frame)
+                  fixed=self.draw_fixed_frame,
+                  duration=self.update_duration_fields)
         self.bind(pos=lambda *args: self.app.manager.set_saved(False),
                   name=lambda *args: self.app.manager.set_saved(False),
                   resource=lambda *args: self.app.manager.set_saved(False),
                   duration=lambda *args: self.app.manager.set_saved(False),
-                  unit=lambda *args: self.app.manager.set_saved(False),
                   description=lambda *args: self.app.manager.set_saved(False),
                   activated=lambda *args: self.app.manager.set_saved(False),
                   state=lambda *args: self.app.manager.set_saved(False),
                   fixed=lambda *args: self.app.manager.set_saved(False),
-                  max_end_day=lambda *args: self.app.manager.set_saved(False),
+                  max_end_date=lambda *args: self.app.manager.set_saved(False),
                   assignments=lambda *args: self.app.manager.set_saved(False))
         self.bind(resource=self.update_planning_state,
+                  begin_date=self.update_planning_state,
                   duration=self.update_planning_state,
-                  max_end_day=self.update_planning_state,
+                  max_end_date=self.update_planning_state,
                   activated=self.update_planning_state,
                   state=self.update_planning_state)
-        self.ids.duration_text_field.bind(text=self.update_duration)
+        self.ids.day_text_field.bind(text=self.update_duration)
+        self.ids.hour_text_field.bind(text=self.update_duration)
         self.ids.resource_text_field.bind(text=self.update_resource)
-        self.ids.max_end_day_text_field.bind(text=self.update_max_end_day)
+        self.ids.max_end_date_picker_button.bind(
+            on_release=self.open_max_end_date_picker)
+        self.ids.max_end_date_reset_button.bind(
+            on_release=lambda *args: self.update_max_end_date(None))
         self.set_gradient_colors()
         self.draw_fixed_frame()
 
-    def update_duration(self, instance, value):
-        if value != "":
-            self.set_duration(int(value), self.unit)
+    def update_duration(self, *args):
+        day = self.ids.day_text_field.text
+        hour = self.ids.hour_text_field.text
+        duration = TaskDelta(0)
+        if day != "":
+            duration.add_duration(int(day), unit="day")
+        if hour != "":
+            duration.add_duration(int(hour), unit="hour")
+        self.set_duration(duration)
+
+    def update_duration_fields(self, *args):
+        day, hour = self.duration.get_duration("split")
+        self.ids.day_text_field.text = str(day)
+        self.ids.hour_text_field.text = str(hour)
 
     def update_resource(self, instance, value):
         if value != "":
             self.resource = int(value)
 
-    def update_max_end_day(self, instance, value):
-        if value != "":
-            self.max_end_day = int(value)
+    def update_max_end_date(self, date):
+        if date is not None:
+            self.max_end_date = TaskDate.from_date(date, 0)
+        else:
+            self.max_end_date = None
+
+    def open_max_end_date_picker(self, *args):
+        mas_end_date_dialog = MDDatePicker()
+        mas_end_date_dialog.bind(on_save=lambda instance, date, date_range:
+                                 self.update_max_end_date(date))
+        mas_end_date_dialog.open()
 
     def get_state_gradient_colors(self):
         if self.state == "done":
@@ -532,9 +609,9 @@ class Task(Component):
         self.prev_state = value
         self.set_gradient_colors()
 
-    def update_state(self, time):
+    def update_state(self, *args):
         if self.state != "done":
-            self.set_undone(time)
+            self.set_undone()
 
     def draw_fixed_frame(self, *args):
         self.canvas.after.remove_group("fixed_frame")
@@ -546,7 +623,8 @@ class Task(Component):
                      group="fixed_frame")
 
     def set_done(self):
-        if self.get_begin_day() > self.app.manager.get_current_time("day") + 1:
+        if self.begin_date > self.app.manager.get_current_date(
+        ) + TaskDelta.day(self.app.manager):
             toast("The task cannot be done before it has begun")
             return
         if self.app.manager.has_undone_anterior_tasks(self):
@@ -555,22 +633,23 @@ class Task(Component):
             )
             return
 
-        end_day = self.get_end_day()
-        current_day = self.app.manager.get_current_time("day") + 1
-        if end_day > current_day:
-            self.set_unit("hour")
-            self.set_duration(self.get_duration("hour") -
-                              self.get_duration_between(
-                                  current_day, end_day, dst_unit="hour"),
-                              unit="hour")
+        current_date = self.app.manager.get_current_date()
+        if self.get_end_date().floored() > current_date:
+            delta = TaskDelta(
+                sum(self.get_durations_span()[:int(
+                    ceil((current_date + TaskDelta.day(self.app.manager) -
+                          self.begin_date).get_duration("day")))]))
+
+            self.set_duration(delta)
         self.state = "done"
 
-    def set_undone(self, day):
-        if self.is_in_progress_for_day(day):
+    def set_undone(self):
+        if self.is_in_progress_for_date(self.app.manager.get_current_date(),
+                                        strict=False):
             self.state = "progress"
-        elif self.get_begin_time('day') > day:
+        elif self.begin_date > self.app.manager.get_current_date():
             self.state = "pending"
-        elif self.get_end_time('day') <= day:
+        elif self.get_end_date() <= self.app.manager.get_current_date():
             self.state = "waiting_for_treatment"
 
     def update_planning_state(self, *args):
@@ -581,12 +660,6 @@ class Task(Component):
 
     def callback_off(self, *args):
         self.activated = False
-
-    def set_unit(self, unit):
-        if self.fixed:
-            return
-
-        self.unit = unit
 
     def on_touch_down(self, touch):
         if touch.is_double_tap and self.collide_point(*touch.pos):
@@ -609,83 +682,72 @@ class Task(Component):
         else:
             return super().on_touch_down(touch)
 
-    def get_begin_time(self, unit="day"):
-        if unit == "day":
-            return self.begin_time / self.app.manager.get_day_duration()
-        elif unit == "hour":
-            return self.begin_time
+    def is_in_progress_for_date(self, date, strict=True):
+        """Return True iff the task is in progress at date, strict=False indicates to consider day extended interval"""
+        if strict:
+            return self.begin_date <= date < self.get_end_date()
+        else:
+            return self.begin_date.floored() <= date < self.get_end_date(
+            ).ceiled()
 
-    def set_begin_time(self, begin_time, unit="day", force=False):
+    def do_continue(self, date, strict=True):
+        if strict:
+            return date < self.get_end_date()
+        else:
+            return date < self.get_end_date().floored()
+
+    def get_begin_date(self):
+        return self.begin_date
+
+    def set_begin_date(self, begin_date, force=False):
         if not force and (self.fixed or self.state == "done"):
             return
 
-        if unit == "day":
-            self.begin_time = begin_time * self.app.manager.get_day_duration()
-        elif unit == "hour":
-            self.begin_time = begin_time
+        self.begin_date = begin_date
 
-    def get_duration(self, unit="day"):
-        if unit == "hour":
-            return self.duration
-        elif unit == "day":
-            return self.duration / self.app.manager.get_day_duration()
+    def get_duration(self):
+        return self.duration
 
-    def set_duration(self, duration, unit="day", force=False):
+    def set_duration(self, duration: TaskDelta, force=False):
         if not force and (self.fixed or self.state == "done"):
             return
 
-        if unit == "hour":
-            self.duration = int(duration)
-        elif unit == "day":
-            self.duration = int(duration * self.app.manager.get_day_duration())
+        self.duration = duration
 
-    def get_end_time(self, unit="day"):
-        return self.get_begin_time(unit) + self.get_duration(unit)
+    def add_duration(self, duration: TaskDelta, force=False):
+        if not force and (self.fixed or self.state == "done"):
+            return
 
-    def get_max_end_time(self, unit="day"):
-        if self.max_end_day is not None:
-            if unit == "hour":
-                return self.max_end_time * self.app.manager.get_day_duration()
-            elif unit == "day":
-                return self.max_end_time
+        self.duration += duration
 
-    def is_in_progress_for_day(self, day):
-        return int(self.get_begin_time("day")) <= day < ceil(
-            self.get_end_time("day"))
+    def get_end_date(self):
+        durations_span = [
+            e if e != 0 else 7 for e in self.get_durations_span()
+        ]
+        return self.begin_date + TaskDelta(sum(durations_span))
 
-    def do_continue(self, day):
-        return day < int(ceil(self.get_end_time("day"))) - 1
-
-    def get_duration_between(self, begin_day, end_day, dst_unit="hour"):
-        begin_time = self.get_begin_time("hour")
-        end_time = self.get_end_time("hour")
-        begin_day *= self.app.manager.get_day_duration()
-        end_day *= self.app.manager.get_day_duration()
-        if begin_day < begin_time:
-            begin_day = begin_time
-        if end_day > end_time:
-            end_day = end_time
-
-        if dst_unit == "hour":
-            return max(0, end_day - begin_day)
-
-        return max(0,
-                   end_day - begin_day) / self.app.manager.get_day_duration()
-
-    def get_duration_for_day(self, day):
-        return self.get_duration_between(day, day + 1, dst_unit="hour")
-
-    def get_begin_day(self):
-        return int(self.get_begin_time("day")) + 1
-
-    def get_end_day(self):
-        return int(ceil(self.get_end_time("day")))
+    def get_durations_span(self):
+        duration = self.duration.get_duration("hour")
+        task_date = copy(self.begin_date)
+        span = []
+        while duration > 0:
+            if task_date.date.weekday() in self.app.manager.get_week_days():
+                day_duration = min(task_date.next_day(), duration)
+                span.append(day_duration)
+                duration -= day_duration
+            else:
+                span.append(0)
+                task_date.next_day()
+        return span
 
     def get_progression(self):
-        current_day = self.app.manager.get_current_time("day")
-        return self.get_duration_between(
-            self.get_begin_day() - 1, current_day,
-            dst_unit="hour") / self.get_duration(unit="hour") * 100
+        if self.state == "done":
+            return 100
+
+        current_date = self.app.manager.get_current_date()
+        return sum(self.get_durations_span()[:max(
+            0, int(ceil((current_date - self.begin_date).get_duration("day")))
+        )]) / self.duration.get_duration() * 100
 
     def get_consumed_resources(self):
         return self.resource
@@ -695,10 +757,9 @@ class Task(Component):
 
     def to_dict(self, **kwargs):
         return super().to_dict(duration=self.duration,
+                               begin_date=self.begin_date,
                                resource=self.resource,
-                               begin_time=self.begin_time,
-                               max_end_day=self.max_end_day,
-                               unit=self.unit,
+                               max_end_date=self.max_end_date,
                                name=self.name,
                                description=self.description,
                                activated=self.activated,
@@ -709,36 +770,30 @@ class Task(Component):
 
 
 class StartTask(Component):
-    def get_begin_time(self, unit="day"):
-        return 0
+    def get_begin_date(self):
+        return self.app.manager.get_project_begin_date()
 
-    def get_duration(self, unit="day"):
-        return 0
+    def get_duration(self):
+        return TaskDelta(0)
 
 
 class EndTask(Component):
-    begin_time = NumericProperty()
-    unit = StringProperty("day")
+    begin_date = ObjectProperty()
 
-    def get_begin_time(self, unit="day"):
-        if unit == "day":
-            return self.begin_time / self.app.manager.get_day_duration()
-        else:
-            return self.begin_time
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
-    def set_begin_time(self, begin_time, unit="day"):
-        if unit == "day":
-            self.begin_time = begin_time * self.app.manager.get_day_duration()
-        else:
-            self.begin_time = begin_time
+    def get_begin_date(self):
+        return self.begin_date
 
-    def get_duration(self, unit="day"):
-        return 0
+    def set_begin_date(self, begin_date):
+        self.begin_date = begin_date
+
+    def get_duration(self):
+        return TaskDelta(0)
 
     def to_dict(self, **kwargs):
-        return super().to_dict(begin_time=self.begin_time,
-                               unit=self.unit,
-                               **kwargs)
+        return super().to_dict(begin_date=self.begin_date, **kwargs)
 
 
 class ComponentBar(RelativeLayout):
@@ -764,6 +819,12 @@ class GrabableGrid(ScatterLayout):
 
     def setup_grid(self):
         self.grid = Grid(size_hint=(None, None))
+        self.grid.bind(height=lambda instance, value: self.grid.setter(
+            'bold_step_horizontal')
+                       (instance, value / self.grid.square_height / 3),
+                       width=lambda instance, value: self.grid.setter(
+                           'bold_step_vertical')
+                       (instance, value / self.grid.square_width / 3))
         self.add_widget(self.grid)
 
         self.bind(size=self.update_grid)
@@ -844,11 +905,39 @@ class GrabableGrid(ScatterLayout):
         self.grid.draw_grid()
 
 
+class TimeSpan(BoxLayout):
+    begin_date = ObjectProperty()
+    end_date = ObjectProperty()
+    text = StringProperty()
+    margin = NumericProperty()
+    chunk_size = NumericProperty()
+    index_unit = StringProperty()
+
+    bar_y = NumericProperty()
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+        self.setup()
+
+    def setup(self):
+        rule = rrule.DAILY if self.index_unit == "day" else rrule.HOURLY
+        for i, date in enumerate(
+                rrule.rrule(rule, dtstart=self.begin_date,
+                            until=self.end_date)):
+            self.ids.week_days_layout.add_widget(
+                CircleIndex(index=str(date.day)
+                            if self.index_unit == "day" else str(i),
+                            size_hint=(None, None),
+                            size=(self.chunk_size - self.margin,
+                                  self.chunk_size - self.margin)))
+
+
 class ScrollablePlanning(FloatLayout):
     chunk_size = NumericProperty()
     margin = NumericProperty()
-    n_rows = NumericProperty(1)
-    n_cols = NumericProperty(1)
+    n_rows = NumericProperty()
+    n_cols = NumericProperty()
     tasks_width = NumericProperty()
     tasks_height = NumericProperty(10)
     planning_unit = StringProperty("day")
@@ -871,12 +960,23 @@ class ScrollablePlanning(FloatLayout):
 
         self.bind(n_waiting_for_treatment=self.update_planning_state)
         self.app.manager.planning.bind(planning_state=self.update_cursor,
-                                       horizons=self.update_cursor)
+                                       totals_hours=self.update_cursor)
+
+    def update_week_days(self, *args):
+        self.ids.planning_grid.colored_columns = []
+        if self.planning_unit == "day":
+            for i, date in enumerate(
+                    rrule.rrule(
+                        rrule.DAILY,
+                        dtstart=self.app.manager.get_project_begin_date().date,
+                        until=self.app.manager.get_project_end_date().date)):
+                if date.weekday() not in self.app.manager.get_week_days():
+                    self.ids.planning_grid.colored_columns.append(i)
 
     def update_cursor(self, *args):
         if self.cursor:
-            self.cursor.max_cursor_position = len(
-                self.app.manager.get_horizons("day"))
+            self.cursor.max_cursor_position = self.app.manager.get_current_total_hours(
+            ) // self.app.manager.get_day_duration()
 
     def update_planning_state(self, *args):
         if self.n_waiting_for_treatment == 0:
@@ -884,10 +984,10 @@ class ScrollablePlanning(FloatLayout):
         else:
             self.app.manager.set_planning_state("waiting_for_treatment")
 
-    def set_cursor(self, time):
+    def setup_cursor(self, date):
         self.cursor = TimeCursor(size_hint=(None, None),
-                                 gradient_colors=[(0.8, 0.2, 0.1, 0.8),
-                                                  (0.2, 0.2, 0.4, 0.8)],
+                                 gradient_colors=[(0.8, 0.2, 0.1, 0.6),
+                                                  (0.2, 0.2, 0.4, 0.6)],
                                  size=(self.chunk_size,
                                        self.ids.planning_grid.height),
                                  buttons_width=self.chunk_size,
@@ -897,28 +997,40 @@ class ScrollablePlanning(FloatLayout):
         self.update_cursor()
 
         # Add the cusor in the backgroud
-        children = self.ids.planning_layout.children.copy()
-        self.ids.planning_layout.clear_widgets()
         self.ids.planning_layout.add_widget(self.cursor)
-        for child in children:
-            self.ids.planning_layout.add_widget(child)
 
-        self.cursor.set_cursor(time)
-        self.cursor.bind(cursor_position=lambda _, value: self.app.manager.
-                         set_current_time(value))
+        self.cursor.set_cursor(
+            (date -
+             self.app.manager.get_project_begin_date()).get_duration("day"))
         self.cursor.bind(cursor_position=lambda *args: self.app.manager.
                          get_planning_screen().update_planning_state())
         self.ids.planning_grid.bind(height=self.cursor.setter('height'))
 
-    def set_times(self, end):
+    def set_times(self, start_date, end_date):
         self.ids.time_layout.clear_widgets()
-        for i in range(1, end + 1):
-            time_index = CircleIndex(index=f'{i}',
-                                     size=(self.chunk_size - self.margin,
-                                           self.chunk_size - self.margin),
-                                     pos_hint={"center_y": 0.5})
-            self.ids.time_layout.add_widget(time_index)
-        self.n_cols = end
+
+        freq = 7 if self.planning_unit == "day" else self.app.manager.get_day_duration(
+        )
+        rule = rrule.WEEKLY if self.planning_unit == "day" else rrule.DAILY
+        delta = datetime.timedelta(
+            days=freq -
+            1) if self.planning_unit == "day" else datetime.timedelta(
+                hours=freq - 1)
+
+        self.n_cols = 0
+        for i, date in enumerate(
+                rrule.rrule(rule, dtstart=start_date, until=end_date)):
+            end = date + delta
+            text = f"({date.day}-{date.month}-{date.year}) Week {i+1} ({end.day}-{end.month}-{end.year})" if self.planning_unit == "day" else f"Day ({date.day}-{date.month}-{date.year})"
+            time_span = TimeSpan(text=text,
+                                 begin_date=date,
+                                 end_date=end,
+                                 index_unit=self.planning_unit,
+                                 chunk_size=self.chunk_size,
+                                 margin=self.margin,
+                                 pos_hint={"center_y": 0.5})
+            self.ids.time_layout.add_widget(time_span)
+            self.n_cols += freq
 
     def on_unit_switch(self, unit):
         self.load(unit)
@@ -939,17 +1051,14 @@ class ScrollablePlanning(FloatLayout):
 
         Clock.schedule_once(update_tasks_height)
 
-    def add_task_span(self, i, cursor_position, do_continue, movable,
-                      planning_unit, task):
+    def add_task_span(self, i, j, planning_unit, task):
         task_span = TaskSpan(i=i,
-                             cursor_position=cursor_position,
+                             cursor_position=j,
                              n=self.n_rows,
                              planning_unit=planning_unit,
                              square_width=self.chunk_size,
                              square_height=self.tasks_height,
-                             task=task,
-                             do_continue=do_continue,
-                             do_move_x=movable)
+                             task=task)
         self.bind(tasks_height=task_span.setter('square_height'))
         self.ids.planning_grid.add_widget(task_span)
 
@@ -968,36 +1077,39 @@ class ScrollablePlanning(FloatLayout):
         self.planning_unit = unit
 
         if self.planning_unit == "day":
-            self.set_times(self.app.manager.get_horizon('day'))
+            self.set_times(self.app.manager.get_project_begin_date().date,
+                           self.app.manager.get_project_end_date().date)
 
             # Build the planning
             for i, task in enumerate(self.app.manager.get_tasks()):
                 self.add_task_span(
                     i=i + 1,
-                    cursor_position=task.get_begin_time("hour"),
-                    do_continue=False,
-                    movable=not (task.fixed or task.state == "done"),
+                    j=(task.begin_date -
+                       self.app.manager.get_project_begin_date()).hours,
                     planning_unit=self.planning_unit,
                     task=task)
 
-            self.set_cursor(self.app.manager.get_current_time())
+            self.setup_cursor(self.app.manager.get_current_date())
         else:
-            self.set_times(self.app.manager.get_day_duration())
+            date = datetime.datetime.combine(
+                self.app.manager.get_project_begin_date().date +
+                datetime.timedelta(days=self.cursor.cursor_position * 7),
+                datetime.datetime.min.time())
+            self.set_times(
+                date, date +
+                datetime.timedelta(hours=self.app.manager.get_day_duration()))
 
             # Build the planning
-            current_time_hour = self.app.manager.get_current_time("hour")
-            current_time_day = self.app.manager.get_current_time("day")
+            current_date = self.app.manager.get_current_date()
             for i, task in enumerate(self.app.manager.get_tasks()):
-                begin_time_hour = task.get_begin_time("hour")
-                if task.is_in_progress_for_day(current_time_day):
+                if task.is_in_progress_for_date(current_date, strict=False):
                     self.add_task_span(
                         i=i + 1,
-                        cursor_position=max(
-                            0, begin_time_hour - current_time_hour),
-                        do_continue=task.do_continue(current_time_day),
-                        movable=False,
+                        j=max(0, (task.begin_date - current_date).hours) *
+                        self.app.manager.get_day_duration(),
                         planning_unit=self.planning_unit,
                         task=task)
+        self.update_week_days()
 
 
 class CreateProjectDialogContent(BoxLayout):
@@ -1130,42 +1242,57 @@ class BurndownChart(BoxLayout):
         self.clear_widgets()
 
         # Compute burndown chart
-        horizon_day = self.app.manager.get_horizon("day")
-        horizons = self.app.manager.get_horizons("hour")
-        current_time = self.app.manager.get_current_time("day")
-        max_t = min(len(horizons) + 1, current_time + 2)
-        X = np.arange(0, horizon_day + 1)
+        totals_hours = self.app.manager.get_totals_hours()
+        current_index = self.app.manager.date_to_index(
+            self.app.manager.get_current_date(
+            )) // self.app.manager.get_day_duration()
+        project_end_index = self.app.manager.date_to_index(
+            self.app.manager.get_project_end_date(
+            )) // self.app.manager.get_day_duration()
+        max_t = min(len(totals_hours) + 1, current_index + 2)
+        X = np.arange(0, project_end_index + 1)
         x = np.arange(0, max_t)
-        y = np.array([horizons[0]] +
-                     [horizon for horizon in horizons[:max_t - 1]])
-        d_horizons = np.array([0] + [y[i] - y[i - 1] for i in range(1, max_t)])
-        over_estimated_mask = d_horizons < 0
-        under_estimated_mask = d_horizons > 0
+        y = np.array([totals_hours[0]] +
+                     [total_hours for total_hours in totals_hours[:max_t - 1]])
+        d_totals_hours = np.array([0] +
+                                  [y[i] - y[i - 1] for i in range(1, max_t)])
+        over_estimated_mask = d_totals_hours < 0
+        under_estimated_mask = d_totals_hours > 0
         y_lim = max(y)
 
         for task in self.app.manager.get_tasks():
-            end_day = task.get_end_day()
-            if end_day <= current_time:
-                duration = task.get_duration("hour")
-                begin_day = task.get_begin_day()
-
-                # Average the duration of the task over its execution
+            if task.state == "done":
+                durations_span = [
+                    e for e in task.get_durations_span() if e != 0
+                ]
                 duration_acc = 0
-                for t in range(begin_day, end_day):
-                    duration_acc += task.get_duration_for_day(t)
-                    y[t] -= duration_acc
-                for t in range(end_day, len(y)):
-                    y[t] -= duration
+                i = 1  # Begin to 1 because of the right shift of barplot
+                begin_index = self.app.manager.date_to_index(
+                    task.begin_date) // self.app.manager.get_day_duration()
+                # Average the duration of the task over its execution
+                for date in rrule.rrule(
+                        rrule.DAILY,
+                        dtstart=task.begin_date.date,
+                        until=self.app.manager.get_project_end_date().date):
+                    if date.weekday() in self.app.manager.get_week_days():
+                        if begin_index + i >= len(y):
+                            break
+                        if i - 1 < len(durations_span):
+                            duration_acc += durations_span[i - 1]
+                        y[begin_index + i] -= duration_acc
+                        i += 1
+
         reg = LinearRegression().fit(np.reshape(x, (-1, 1)), y)
 
+        # Plot
         self.fig, ax = plt.subplots()
         ax.bar(x[:-1], y[:-1], color='blue')
         ax.bar([x[-1]], [y[-1]], color='orange')
         ax.bar(x[under_estimated_mask],
-               d_horizons[under_estimated_mask],
+               d_totals_hours[under_estimated_mask],
                color='red')
         ax.bar(x[over_estimated_mask],
-               -d_horizons[over_estimated_mask],
+               -d_totals_hours[over_estimated_mask],
                color='green')
         reg_line = ax.plot(X, [reg.coef_[0] * t + reg.intercept_ for t in X],
                            label='linear regression',
@@ -1175,10 +1302,11 @@ class BurndownChart(BoxLayout):
         ax.set_title("Burndown chart")
         ax.set_ylim([0, y_lim + 1])
         ax.set_xticks(X)
+        end_date = self.app.manager.get_planned_end_date()
         ax.text(
             1.0,
             1.0,
-            f'Velocity: {int(round(-reg.coef_[0]))} hour/day\nPlanned end day: {self.app.manager.get_planned_end_day()} day',
+            f'Velocity: {int(round(-reg.coef_[0]))} hour/day\nPlanned: {end_date}|{self.app.manager.date_to_index(end_date)//self.app.manager.get_day_duration()+1}',
             horizontalalignment='right',
             verticalalignment='bottom',
             transform=ax.transAxes)
@@ -1209,7 +1337,7 @@ class TaskLabel(BoxLayout):
 
 class TaskTreatmentDialog(BoxLayout):
     task = ObjectProperty()
-    unit = StringProperty()
+    unit = StringProperty("hour")
 
     def set_unit(self, unit):
         self.unit = unit
@@ -1218,18 +1346,46 @@ class TaskTreatmentDialog(BoxLayout):
 class TimeCursor(DiscreteMovableBehavior, VerticalGradientRectangle):
     arrow_width = NumericProperty()
 
+    def __init__(self, **kwargs):
+        self.app = MDApp.get_running_app()
+        super().__init__(**kwargs)
 
-class TaskSpan(DiscreteMovableBehavior, HorizontalGradientRectangle,
-               TaskTooltiped):
+    def on_move_left(self, *args):
+        self.app.manager.decrease_current_date(TaskDelta.day(self.app.manager))
+        if self.app.manager.get_current_date().date.weekday(
+        ) not in self.app.manager.get_week_days():
+            self.cursor_position -= 1
+            self.dispatch("on_move_left")
+
+    def on_move_right(self, *args):
+        self.app.manager.increase_current_date(TaskDelta.day(self.app.manager))
+        if self.app.manager.get_current_date().date.weekday(
+        ) not in self.app.manager.get_week_days():
+            self.cursor_position += 1
+            self.dispatch("on_move_right")
+
+
+class TaskSpanSpacer(Widget):
+    square_width = NumericProperty()
+    square_height = NumericProperty()
+
+
+class TaskSpanElement(HorizontalGradientRectangle):
+    square_width = NumericProperty()
+    square_height = NumericProperty()
+
+    hour_span = NumericProperty(0)
+
+
+class TaskSpan(DiscreteMovableBehavior, RelativeLayout, TaskTooltiped):
     i = NumericProperty()
     n = NumericProperty()
-    spanning = NumericProperty()
     planning_unit = StringProperty()
     square_width = NumericProperty()
     square_height = NumericProperty()
-    do_continue = BooleanProperty(False)
     task = ObjectProperty()
-    compute_spanning = ObjectProperty()
+
+    gradient_colors = ListProperty()
 
     def __init__(self, **kw):
         super().__init__(**kw)
@@ -1241,41 +1397,98 @@ class TaskSpan(DiscreteMovableBehavior, HorizontalGradientRectangle,
         self.set_gradient_colors()
         self.task.bind(state=self.set_gradient_colors,
                        description=self.setter('tooltip_txt'),
-                       duration=self.update_spanning,
-                       fixed=lambda instance, value: self.setter('do_move_x')
-                       (instance, not value))
+                       duration=self.build,
+                       begin_date=self.build)
         self.task.bind(fixed=self.draw_fixed_frame,
                        duration=self.update_tooltip,
-                       begin_time=self.update_tooltip)
-        self.bind(do_continue=self.draw_continue_arrow,
-                  cursor_position=lambda _, value: self.task.set_begin_time(
-                      value, 'hour'))
-        self.bind(cursor_position=lambda *args: self.task.update_state(
-            self.app.manager.get_current_time()))
-        self.update_spanning()
+                       begin_date=self.update_tooltip)
+        self.bind(cursor_position=self.task.update_state)
+
+        if self.planning_unit == "day":
+            self.task.bind(
+                fixed=lambda instance, value: self.setter('do_move_x')
+                (instance, not (value or self.task.state == "done")))
+        else:
+            self.do_move_x = False
+
         self.update_tooltip()
+        self.build()
         self.draw_continue_arrow()
         self.draw_fixed_frame()
 
-    def update_spanning(self, *args):
+    def on_move_left(self, *args):
+        self.task.set_begin_date(self.task.begin_date - TaskDelta(1))
+        if self.task.begin_date.date.weekday(
+        ) not in self.app.manager.get_week_days():
+            self.cursor_position -= 1
+            self.dispatch("on_move_left")
+
+    def on_move_right(self, *args):
+        self.task.set_begin_date(self.task.begin_date + TaskDelta(1))
+        if self.task.begin_date.date.weekday(
+        ) not in self.app.manager.get_week_days():
+            self.cursor_position += 1
+            self.dispatch("on_move_right")
+
+    def get_current_span(self, unit="hour"):
+        if unit == "hour":
+            return self.durations_span[int(
+                ceil(
+                    (self.app.manager.get_current_date() - self.task.begin_date
+                     ).hours / self.app.manager.get_day_duration())
+            )] * self.app.manager.get_day_duration()
+        elif unit == "day":
+            return self.durations_span[int(
+                ceil((self.app.manager.get_current_date() -
+                      self.task.begin_date).hours /
+                     self.app.manager.get_day_duration()))]
+
+    def build(self, *args):
+        self.durations_span = self.task.get_durations_span()
+        self.ids.layout.clear_widgets()
+
         if self.planning_unit == "day":
-            self.spanning = self.task.get_duration(self.planning_unit)
+            begin_gradient_color = self.gradient_colors[0]
+            durations_acc = 0
+            for i, hours in enumerate(self.durations_span):
+                if hours > 0:
+                    durations_acc += self.durations_span[i]
+                    t = durations_acc / self.task.duration.get_duration()
+                    end_gradient_color = list(
+                        (1 - t) * np.array(self.gradient_colors[0]) +
+                        t * np.array(self.gradient_colors[1]))
+                    element = TaskSpanElement(square_width=self.square_width,
+                                              square_height=self.square_height,
+                                              gradient_colors=[
+                                                  begin_gradient_color,
+                                                  end_gradient_color
+                                              ],
+                                              hour_span=hours)
+                    self.ids.layout.add_widget(element)
+                    begin_gradient_color = end_gradient_color
+                else:
+                    self.ids.layout.add_widget(
+                        TaskSpanSpacer(square_width=self.square_width,
+                                       square_height=self.square_height))
         else:
-            self.spanning = self.task.get_duration_for_day(
-                self.app.manager.get_current_time())
-        self.max_cursor_position = self.app.manager.get_horizon(
-            "hour") - self.spanning - 1
+            element = TaskSpanElement(square_width=self.square_width,
+                                      square_height=self.square_height,
+                                      gradient_colors=self.gradient_colors,
+                                      hour_span=self.get_current_span("hour"))
+            self.ids.layout.add_widget(element)
 
     def draw_continue_arrow(self, *args):
         self.canvas.after.remove_group("continue_arrow")
-        if self.do_continue:
+        if self.planning_unit == "hour" and self.task.do_continue(
+                self.app.manager.get_current_date(), strict=False):
+            span = self.get_current_span("day")
             with self.canvas.after:
                 Color(0.0, 0.0, 0.0)
                 Triangle(points=[
-                    self.x + self.spanning * self.square_width, self.y,
-                    self.x + self.spanning * self.square_width,
+                    self.x + span * self.square_width, self.y,
+                    self.x + span * self.square_width,
                     self.y + self.square_height,
-                    self.x + (self.spanning + 1 / 2.0) * self.square_width,
+                    self.x + (span + 1 / 2.0) * self.square_width,
                     self.y + self.square_height / 2.0
                 ],
                          group="continue_arrow")
@@ -1292,17 +1505,30 @@ class TaskSpan(DiscreteMovableBehavior, HorizontalGradientRectangle,
     def set_gradient_colors(self, *args):
         self.gradient_colors = self.task.get_state_gradient_colors()
 
+        begin_gradient_colors = self.gradient_colors[0]
+        durations_acc = 0
+        for i, element in enumerate(self.ids.layout.children[::-1]):
+            if isinstance(element, TaskSpanElement):
+                durations_acc += self.durations_span[i]
+                t = durations_acc / self.task.duration.get_duration()
+                end_gradient_color = list(
+                    (1 - t) * np.array(self.gradient_colors[0]) +
+                    t * np.array(self.gradient_colors[1]))
+                element.gradient_colors = [
+                    begin_gradient_colors, end_gradient_color
+                ]
+                begin_gradient_colors = end_gradient_color
+
     def on_touch_down(self, touch):
         if touch.is_double_tap and self.collide_point(*touch.pos):
-            content = TaskTreatmentDialog(task=self.task, unit=self.task.unit)
+            content = TaskTreatmentDialog(task=self.task)
 
             def on_validate(*args):
-                self.task.set_unit(content.unit)
                 try:
-                    self.task.set_duration(
-                        int(self.task.get_duration(content.unit)) +
+                    self.task.duration.add_duration(
                         int(content.ids.prolongation_field.text), content.unit)
-                    self.task.update_state(self.app.manager.get_current_time())
+                    self.task.update_state()
+                    self.build()
                 except:
                     if not (self.task.fixed or self.task.state == "done"):
                         toast("Invalid prolongation value")
@@ -1310,8 +1536,7 @@ class TaskSpan(DiscreteMovableBehavior, HorizontalGradientRectangle,
 
             def on_done(*args):
                 if self.task.state == "done":
-                    self.task.set_undone(
-                        self.app.manager.get_current_time("day"))
+                    self.task.set_undone()
                 else:
                     self.task.set_done()
                 sheetview.dismiss()

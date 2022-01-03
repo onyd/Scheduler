@@ -8,7 +8,7 @@ from pyomo.opt.results.solver import TerminationCondition
 class SchedulerSolver:
     def __init__(self, n_tasks, end_index, anteriority_edges,
                  fixed_begin_times, min_begin_times, max_end_times, durations,
-                 consumed_resources, capacity) -> None:
+                 consumed_resources, capacity, horizon) -> None:
         self.n_tasks = n_tasks
         self.anteriority_edges = anteriority_edges
         self.fixed_begin_times = fixed_begin_times
@@ -18,9 +18,7 @@ class SchedulerSolver:
         self.consumed_resources = consumed_resources
         self.capacity = capacity
         self.end = end_index
-
-        # Compute a inferior bound for end time
-        self.horizon = sum(self.durations)
+        self.horizon = horizon
 
     def solve(self):
         model = pyo.ConcreteModel()

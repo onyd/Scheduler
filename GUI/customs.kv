@@ -4,6 +4,49 @@
 
 
 #:set res "resources/icon/"
+<CheckableChip>:
+    check: True
+<TimeSpan>:
+    orientation: 'vertical'
+    spacing: self.margin
+    padding_y: self.margin
+
+    size_hint_x: None
+    width: self.minimum_width
+
+    bar_y: label.y
+    canvas.after:
+        Color:
+            rgb: 0.0, 0.0, 0.0
+        Line:
+            points: [self.x + self.margin, self.bar_y, self.x + self.width - self.margin, self.bar_y]
+            width: 2
+        Line:
+            points: [self.x + self.margin, self.bar_y, self.x + self.margin, self.bar_y - self.margin]
+            width: 2
+        Line:
+            points: [self.x + self.width - self.margin, self.bar_y, self.x + self.width - self.margin, self.bar_y - self.margin]
+            width: 2
+
+    Label:
+        id: label
+        text: root.text
+        color: 0.0, 0.0, 0.0
+        halign: 'center'
+        valign: 'center'
+        size_hint: None, None
+        size: self.texture_size
+        pos_hint: {'center_x': 0.5}
+
+    BoxLayout:
+        id: week_days_layout
+        size_hint: None, None
+        size: self.minimum_size
+
+        padding: root.margin/2
+        spacing: root.margin
+
+
 <AssignmentChip>:
     icon: 'account'
 
@@ -363,6 +406,7 @@
     selected_button: 'on' if self.activated else 'off'
     icon: 'task.png'
     bar_height: bar.height
+    spacing: root.margin
 
     canvas:
         Color:
@@ -410,62 +454,60 @@
     BoxLayout:
         id: duration_layout
         size_hint: 0.9, None
-        height: duration_text_field.height
+        height: day_text_field.height
         pos_hint: {'center_x': 0.5}
+        spacing: root.margin
         
         LabeledTextField:
-            id: duration_text_field
-            label_text: 'Duration:'
-            input_text: str(int(root.get_duration(root.unit))) if app.manager.planning is not None else str(root.duration)
+            id: day_text_field
+            label_text: 'Day:'
             hint_text: 'integer'
             bg_color: app.theme_cls.primary_color
             input_filter: 'int'
 
             disabled: root.state == 'done' or root.fixed
 
-            size_hint_x: None
-            width: duration_layout.width - unit_switch.width 
+            size_hint_x: 0.5
 
-        CustomSwitch:
-            id: unit_switch
-            selected: root.unit
-            disabled: True if root.fixed or root.state == "done" else False
+        LabeledTextField:
+            id: hour_text_field
+            label_text: 'Hour:'
+            hint_text: 'integer'
+            bg_color: app.theme_cls.primary_color
+            input_filter: 'int'
 
-            size_hint: None, None
-            size: 90, 30
-            pos_hint: {'center_y': 0.5}
+            disabled: root.state == 'done' or root.fixed
 
-            gradient_colors: [(0.0, 0.7, 0.4, 0.6), (0.0, 0.2, 0.7, 0.6)]
-
-            SwitchBase:
-                id: day_unit_switch
-                text: 'day'
-                font_size: 14
-                selected_color: (0.0, 0.7, 0.4, 0.6)
-                callback: lambda x: root.set_unit('day')
-                
-            SwitchBase:
-                text: 'hour'
-                font_size: 14
-                selected_color: (0.0, 0.2, 0.7, 0.6)
-                callback: lambda x: root.set_unit('hour')
-
-            SwitchCursor:
-                font_size: 14
-                anim_duration: 0.6   
+            size_hint_x: 0.5
         
-    LabeledTextField:
-        id: max_end_day_text_field
-        label_text: 'Max end day:'
-        input_text: str(root.max_end_day) if root.max_end_day else ""
-        hint_text: 'integer'
-        bg_color: app.theme_cls.primary_color
-        input_filter: 'int'
-        
-        disabled: root.state == 'done' or root.fixed
-
-        size_hint_x: 0.9
+    BoxLayout:
+        orientation: 'horizontal'
+        size_hint: 0.9, None
+        height: self.minimum_height
         pos_hint: {'center_x': 0.5}
+        spacing: root.margin
+
+        MDFillRoundFlatButton:
+            id: max_end_date_picker_button
+            text: str(root.max_end_date) if root.max_end_date else "-"
+            md_bg_color: app.theme_cls.primary_color
+            radius: [1, ]
+            
+            disabled: root.state == 'done' or root.fixed
+
+            size_hint: 0.6, None
+            height: 32
+
+        MDFillRoundFlatButton:
+            id: max_end_date_reset_button
+            text: "Reset"
+            md_bg_color: app.theme_cls.primary_color
+            radius: [1, ]
+            
+            disabled: root.state == 'done' or root.fixed
+
+            size_hint: 0.4, None
+            height: 32
 
 <DialogSheetView>:
     radius: [14, 14, 14, 14]
@@ -530,7 +572,7 @@
 
         CustomSwitch:
             id: unit_switch
-            selected: root.task.unit
+            selected: root.unit
             disabled: root.task.fixed or root.task.state == "done" 
 
             size_hint: None, None
@@ -572,6 +614,36 @@
         id: day_duration_field
         hint_text: 'Day duration'
         input_filter: 'int'
+    
+    StackLayout:
+        id: day_chips_layout
+        size_hint_y: None
+        height: self.minimum_height
+        padding: sp(3)
+        spacing: sp(6)
+
+        CheckableChip:
+            text: 'Monday'
+            icon: ''
+        CheckableChip:
+            text: 'Tuesday'
+            icon: ''
+        CheckableChip:
+            text: 'Wednesday'
+            icon: ''
+        CheckableChip:
+            text: 'Thursday'
+            icon: ''
+        CheckableChip:
+            text: 'Friday'
+            icon: ''
+        CheckableChip:
+            text: 'Saturday'
+            icon: ''
+        CheckableChip:
+            text: 'Sunday'
+            icon: ''
+
 <DuplicateProjectDialogContent>:
     MDTextField:
         id: name_field
@@ -696,8 +768,6 @@
             orientation: 'horizontal'
             size_hint: (None, None)
             size: (self.minimum_size[0], 2*(root.chunk_size-root.margin))
-            spacing: root.margin
-            padding: root.margin / 2
 
             canvas.before:
                 Color:
@@ -778,7 +848,9 @@
                 size_hint: (None, None)
                 square_size: root.chunk_size, root.tasks_height
                 line_width: 1
-                bold_line: False
+                bold_line_vertical: True
+                bold_line_horizontal: False
+                bold_step_vertical: 7
                 size: (root.n_cols * self.square_width, root.n_rows * self.square_height)
                 pos_hint: {'left': 0, 'top': 1}               
 
@@ -829,19 +901,32 @@
 <TaskSpan>:
     pos: self.cursor_position * (self.square_width / app.manager.get_day_duration()), (self.n-self.i) * self.square_height
     size_hint: (None, None)
-    size: (self.square_width * root.spanning, self.square_height)
-    gradient_colors: [(0.8, 0., 0., 0.5), (0.2, 0.2, 0.8, 0.5)]
+    size: layout.size
 
     buttons_width: self.square_width
     buttons_height: self.square_height
     x_step: self.square_width / app.manager.get_day_duration()
     do_center_button: True
 
+    BoxLayout:
+        orientation: 'horizontal'
+        id: layout
+        size_hint: None, None
+        size: self.minimum_width, root.square_height
+
     SquareIndex:
         index: str(root.task.get_consumed_resources())
         text_color: (1.0, 1.0, 1.0, 1.0)
         bg_color: (0.2, 0.2, 0.2, 0.8)
         pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+<TaskSpanSpacer>:
+    size_hint: (None, None)
+    size: self.square_width, self.square_height
+
+<TaskSpanElement>:
+    size_hint: None, None
+    size: root.hour_span / app.manager.get_day_duration() * root.square_width, root.square_height
+        
 
 <CircleIndex>:
     index: '1'

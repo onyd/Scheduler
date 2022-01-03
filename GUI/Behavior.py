@@ -1,4 +1,5 @@
 from kivy.clock import Clock
+from kivy.event import EventDispatcher
 from kivy.metrics import sp
 from functools import partial
 
@@ -157,7 +158,7 @@ class DiscreteDragBehavior(object):
         touch.grab_current = None
 
 
-class DiscreteMovableBehavior:
+class DiscreteMovableBehavior(object):
     buttons_width = NumericProperty()
     buttons_height = NumericProperty()
     line_width = NumericProperty(2)
@@ -177,8 +178,17 @@ class DiscreteMovableBehavior:
 
     def __init__(self, **kwargs):
         super(DiscreteMovableBehavior, self).__init__(**kwargs)
+        self.register_event_type('on_move_left')
+        self.register_event_type('on_move_right')
+
         self.show_y = None
         self.bind(selected=self.update_buttons, do_move_x=self.update_buttons)
+
+    def on_move_left(self, *args):
+        pass
+
+    def on_move_right(self, *args):
+        pass
 
     def set_cursor(self, cursor_position):
         self.cursor_position = cursor_position
@@ -279,6 +289,7 @@ class DiscreteMovableBehavior:
             if self.collide_button(
                     x, y, right=True
             ) and self.cursor_position < self.max_cursor_position:
+                self.dispatch("on_move_right")
                 self.x += self.x_step
                 self.cursor_position += 1
                 self.update_buttons()
@@ -286,6 +297,7 @@ class DiscreteMovableBehavior:
             elif self.collide_button(
                     x, y, right=False
             ) and self.cursor_position > self.min_cursor_position:
+                self.dispatch("on_move_left")
                 self.x -= self.x_step
                 self.cursor_position -= 1
                 self.update_buttons()
