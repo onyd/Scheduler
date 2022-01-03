@@ -166,7 +166,7 @@ class PlanningScreen(Screen):
             for i2 in adj:
                 yield i1, i2
 
-    def compute_gantt(self):
+    def compute_gantt(self,  force=False):
         # Get PERT graph and copy in  case we have to remove unactivated tasks
         pert_graph = self.app.manager.get_pert()
         pert_copy = pert_graph.copy()
@@ -176,7 +176,7 @@ class PlanningScreen(Screen):
         consumed_resources = []
         min_begin_times = []
         max_end_times = []
-        fixed_begin_time = []
+        fixed_begin_times = []
         end_task = None
         for i, v in enumerate(pert_graph.V):
             if isinstance(v, EndTask):
@@ -184,7 +184,7 @@ class PlanningScreen(Screen):
                 consumed_resources.append(0)
                 min_begin_times.append(None)
                 max_end_times.append(None)
-                fixed_begin_time.append(None)
+                fixed_begin_times.append(None)
                 end_task = v
             elif not isinstance(v, StartTask) and v.activated:
                 durations.append(v.duration.get_duration('hour'))
@@ -193,17 +193,36 @@ class PlanningScreen(Screen):
                 tasks.append(v)
                 max_end_times.append(
                     self.app.manager.date_to_index(v.max_end_date))
-                if v.state == "done" or v.state == "progress" or v.fixed:
-                    min_begin_times.append(None)
-                    fixed_begin_time.append(
+                if v.state == "done" or v.fixed:
+                    min_begin_times.append(self.app.manager.date_to_index(
+                        v.min_begin_date))
+                    fixed_begin_times.append(
                         max(0, self.app.manager.date_to_index(v.begin_date)))
+                elif v.state == "progress":
+                    min_begin_times.append(self.app.manager.date_to_index(
+                        v.min_begin_date))
+                    if not force:
+                        fixed_begin_times.append(
+                            max(0, self.app.manager.date_to_index(v.begin_date)))
+                    else:
+                        fixed_begin_times.append(None)
                 else:
-                    min_begin_times.append(
-                        self.app.manager.date_to_index(
-                            self.app.manager.get_current_date()))
-                    fixed_begin_time.append(None)
+                    min_begin_index = self.app.manager.date_to_index(
+                        v.min_begin_date)
+                    current_index = self.app.manager.date_to_index(
+                        self.app.manager.get_current_date())
+                    if min_begin_index is None:
+                        min_begin_index = current_index
+                    elif min_begin_index < current_index:
+                        min_begin_index = current_index
+
+                    min_begin_times.append(min_begin_index)
+                    fixed_begin_times.append(None)
             else:
                 pert_copy.remove_vertex(v)
+        print(min_begin_times)
+        print(fixed_begin_times)
+        # Update total hours and horizon
         self.app.manager.set_total_hours(sum(durations))
         horizon = int(
             (self.app.manager.get_project_end_date() +
@@ -217,7 +236,7 @@ class PlanningScreen(Screen):
             n_tasks=len(tasks) + 1,  # Don't forget the end task
             end_index=pert_copy.V.index(end_task),
             anteriority_edges=list(self.edge_generator(pert_copy.A)),
-            fixed_begin_times=fixed_begin_time,
+            fixed_begin_times=fixed_begin_times,
             min_begin_times=min_begin_times,
             max_end_times=max_end_times,
             durations=durations,
@@ -234,7 +253,34 @@ class PlanningScreen(Screen):
                 self.app.manager.index_to_date(solver.end_time))
             self.app.manager.set_planning_state("up_to_date")
         else:
+
+            yes_button = MDFlatButton(
+                text="Yes",
+                theme_text_color="Custom",
+                text_color=self.app.theme_cls.primary_color,
+            )
+            no_button = MDFlatButton(
+                text="No",
+                theme_text_color="Custom",
+                text_color=self.app.theme_cls.primary_color,
+            )
+            yes_button.bind(
+                on_press=self.on_yes_force_gantt_dialog)
+            no_button.bind(
+                on_press=lambda *args: self.force_gantt_dialog.dismiss())
+
+            self.force_gantt_dialog = MDDialog(
+                text="It seems that the planning is unsolvable,  do you want to recompute in force mode (ie in progress tasks are authorized to be moved)",
+                buttons=[no_button, yes_button]
+            )
+
             self.app.manager.set_planning_state("unsolvable")
+            self.force_gantt_dialog.open()
+
+    def on_yes_force_gantt_dialog(self, *args):
+        self.compute_gantt(force=True)
+        self.scrollable_planning.load()
+        self.force_gantt_dialog.dismiss()
 
     def validate_planning(self):
         if self.app.manager.get_planning_state() == "waiting_for_treatment":
@@ -242,7 +288,7 @@ class PlanningScreen(Screen):
                 "Planning cannot be validated because there is at least one task the needs treatment"
             )
         elif self.app.manager.get_planning_state() == "to_validate":
-            self.compute_gantt()
+            self.compute_gantt(force=False)
         elif self.app.manager.get_planning_state() == "unsolvable":
             toast(
                 "It seems that the planning is unsolvable, please check your constraints in the PERT"

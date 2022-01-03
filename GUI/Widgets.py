@@ -1,4 +1,4 @@
-from copy import copy, deepcopy
+from copy import copy
 import enum
 from kivy.uix.textinput import TextInput
 from kivy.uix.widget import Widget
@@ -9,7 +9,6 @@ import numpy as np
 from math import ceil
 import datetime
 from dateutil import rrule
-from numpy.lib.function_base import gradient
 from sklearn.linear_model import LinearRegression
 
 from kivy.metrics import sp, dp
@@ -484,7 +483,8 @@ class Task(Component):
     begin_date = ObjectProperty()
     duration = ObjectProperty()
     resource = NumericProperty(1)
-    max_end_date = ObjectProperty()
+    max_end_date = ObjectProperty(allownone=True)
+    min_begin_date = ObjectProperty(allownone=True)
     gradient_colors = ListProperty()
     description = StringProperty("")
     activated = BooleanProperty(True)
@@ -499,6 +499,7 @@ class Task(Component):
                  duration,
                  resource,
                  begin_date=TaskDate.from_date(datetime.date.today(), 0),
+                 min_begin_date=None,
                  max_end_date=None,
                  description="",
                  activated=True,
@@ -512,6 +513,7 @@ class Task(Component):
         Clock.schedule_once(lambda x: self.set_duration(duration, force=True))
         self.begin_date = begin_date
         self.max_end_date = max_end_date
+        self.min_begin_date = min_begin_date
         self.description = description
         self.activated = activated
         self.state = state
@@ -533,21 +535,33 @@ class Task(Component):
                   activated=lambda *args: self.app.manager.set_saved(False),
                   state=lambda *args: self.app.manager.set_saved(False),
                   fixed=lambda *args: self.app.manager.set_saved(False),
+                  min_begin_date=lambda *args: self.app.manager.set_saved(
+                      False),
                   max_end_date=lambda *args: self.app.manager.set_saved(False),
                   assignments=lambda *args: self.app.manager.set_saved(False))
         self.bind(resource=self.update_planning_state,
                   begin_date=self.update_planning_state,
                   duration=self.update_planning_state,
+                  min_begin_date=self.update_planning_state,
                   max_end_date=self.update_planning_state,
                   activated=self.update_planning_state,
                   state=self.update_planning_state)
+
+        # Duration/resource binds
         self.ids.day_text_field.bind(text=self.update_duration)
         self.ids.hour_text_field.bind(text=self.update_duration)
         self.ids.resource_text_field.bind(text=self.update_resource)
+
+        # max/min datebinds
+        self.ids.min_begin_date_picker_button.bind(
+            on_release=self.open_min_begin_date_picker)
+        self.ids.min_begin_date_reset_button.bind(
+            on_release=lambda *args: self.update_min_begin_date(None))
         self.ids.max_end_date_picker_button.bind(
             on_release=self.open_max_end_date_picker)
         self.ids.max_end_date_reset_button.bind(
             on_release=lambda *args: self.update_max_end_date(None))
+
         self.set_gradient_colors()
         self.draw_fixed_frame()
 
@@ -570,6 +584,18 @@ class Task(Component):
         if value != "":
             self.resource = int(value)
 
+    def update_min_begin_date(self, date):
+        if date is not None:
+            self.min_begin_date = TaskDate.from_date(date, 0)
+        else:
+            self.min_begin_date = None
+
+    def open_min_begin_date_picker(self, *args):
+        min_begin_date_dialog = MDDatePicker()
+        min_begin_date_dialog.bind(on_save=lambda instance, date, date_range:
+                                   self.update_min_begin_date(date))
+        min_begin_date_dialog.open()
+
     def update_max_end_date(self, date):
         if date is not None:
             self.max_end_date = TaskDate.from_date(date, 0)
@@ -577,10 +603,10 @@ class Task(Component):
             self.max_end_date = None
 
     def open_max_end_date_picker(self, *args):
-        mas_end_date_dialog = MDDatePicker()
-        mas_end_date_dialog.bind(on_save=lambda instance, date, date_range:
+        max_end_date_dialog = MDDatePicker()
+        max_end_date_dialog.bind(on_save=lambda instance, date, date_range:
                                  self.update_max_end_date(date))
-        mas_end_date_dialog.open()
+        max_end_date_dialog.open()
 
     def get_state_gradient_colors(self):
         if self.state == "done":
@@ -759,6 +785,7 @@ class Task(Component):
         return super().to_dict(duration=self.duration,
                                begin_date=self.begin_date,
                                resource=self.resource,
+                               min_begin_date=self.min_begin_date,
                                max_end_date=self.max_end_date,
                                name=self.name,
                                description=self.description,
@@ -821,10 +848,10 @@ class GrabableGrid(ScatterLayout):
         self.grid = Grid(size_hint=(None, None))
         self.grid.bind(height=lambda instance, value: self.grid.setter(
             'bold_step_horizontal')
-                       (instance, value / self.grid.square_height / 3),
-                       width=lambda instance, value: self.grid.setter(
-                           'bold_step_vertical')
-                       (instance, value / self.grid.square_width / 3))
+            (instance, value / self.grid.square_height / 3),
+            width=lambda instance, value: self.grid.setter(
+            'bold_step_vertical')
+            (instance, value / self.grid.square_width / 3))
         self.add_widget(self.grid)
 
         self.bind(size=self.update_grid)
@@ -1150,8 +1177,7 @@ class AssignmentChip(MDChip):
             validate_btn = MDFlatButton(text="Validate", text_color=color)
             discard_btn = MDFlatButton(text="Discard", text_color=color)
             name_field = MDLabel(
-                text=
-                f"Do you want to remove the assignement {self.text} from task {self.assignement_list.task.get_name()} ?"
+                text=f"Do you want to remove the assignement {self.text} from task {self.assignement_list.task.get_name()} ?"
             )
 
             dialog = MDDialog(title="Remove assignment",
@@ -1491,7 +1517,7 @@ class TaskSpan(DiscreteMovableBehavior, RelativeLayout, TaskTooltiped):
                     self.x + (span + 1 / 2.0) * self.square_width,
                     self.y + self.square_height / 2.0
                 ],
-                         group="continue_arrow")
+                    group="continue_arrow")
 
     def draw_fixed_frame(self, *args):
         self.canvas.after.remove_group("fixed_frame")

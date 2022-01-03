@@ -479,7 +479,36 @@
             disabled: root.state == 'done' or root.fixed
 
             size_hint_x: 0.5
-        
+    
+    BoxLayout:
+        orientation: 'horizontal'
+        size_hint: 0.9, None
+        height: self.minimum_height
+        pos_hint: {'center_x': 0.5}
+        spacing: root.margin
+
+        MDFillRoundFlatButton:
+            id: min_begin_date_picker_button
+            text: str(root.min_begin_date) if root.min_begin_date else "-"
+            md_bg_color: app.theme_cls.primary_color
+            radius: [1, ]
+            
+            disabled: root.state == 'done' or root.fixed
+
+            size_hint: 0.6, None
+            height: 32
+
+        MDFillRoundFlatButton:
+            id: min_begin_date_reset_button
+            text: "Reset"
+            md_bg_color: app.theme_cls.primary_color
+            radius: [1, ]
+            
+            disabled: root.state == 'done' or root.fixed
+
+            size_hint: 0.4, None
+            height: 32
+
     BoxLayout:
         orientation: 'horizontal'
         size_hint: 0.9, None
