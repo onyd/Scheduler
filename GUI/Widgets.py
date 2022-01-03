@@ -1402,6 +1402,28 @@ class TaskSpanElement(HorizontalGradientRectangle):
 
     hour_span = NumericProperty(0)
 
+    do_have_index = BooleanProperty(False)
+    index = StringProperty()
+
+    def __init__(self, **kw):
+        super().__init__(**kw)
+        self.square_index = None
+
+        self.bind(do_have_index=self.update_index)
+        self.update_index()
+
+    def update_index(self, *args):
+        if self.do_have_index:
+            self.square_index = SquareIndex(index=self.index,
+                                            text_color=(1.0, 1.0, 1.0, 1.0),
+                                            bg_color=(0.4, 0.4, 0.4, 0.6),
+                                            pos_hint={'center_x': 0.5, 'center_y': 0.5})
+            self.bind(index=self.square_index.setter('index'))
+            self.add_widget(self.square_index)
+        elif self.square_index:
+            self.remove_widget(self.square_index)
+            self.square_index = None
+
 
 class TaskSpan(DiscreteMovableBehavior, RelativeLayout, TaskTooltiped):
     i = NumericProperty()
@@ -1432,8 +1454,9 @@ class TaskSpan(DiscreteMovableBehavior, RelativeLayout, TaskTooltiped):
 
         if self.planning_unit == "day":
             self.task.bind(
-                fixed=lambda instance, value: self.setter('do_move_x')
-                (instance, not (value or self.task.state == "done")))
+                fixed=self.update_do_move_x,
+                state=self.update_do_move_x)
+            self.update_do_move_x()
         else:
             self.do_move_x = False
 
@@ -1441,6 +1464,9 @@ class TaskSpan(DiscreteMovableBehavior, RelativeLayout, TaskTooltiped):
         self.build()
         self.draw_continue_arrow()
         self.draw_fixed_frame()
+
+    def update_do_move_x(self, *args):
+        self.do_move_x = not (self.task.state == "done" or self.task.fixed)
 
     def on_move_left(self, *args):
         self.task.set_begin_date(self.task.begin_date - TaskDelta(1))
@@ -1474,6 +1500,7 @@ class TaskSpan(DiscreteMovableBehavior, RelativeLayout, TaskTooltiped):
         self.ids.layout.clear_widgets()
 
         if self.planning_unit == "day":
+            elements = []
             begin_gradient_color = self.gradient_colors[0]
             durations_acc = 0
             for i, hours in enumerate(self.durations_span):
@@ -1490,17 +1517,24 @@ class TaskSpan(DiscreteMovableBehavior, RelativeLayout, TaskTooltiped):
                                                   end_gradient_color
                                               ],
                                               hour_span=hours)
+                    elements.append(element)
                     self.ids.layout.add_widget(element)
                     begin_gradient_color = end_gradient_color
                 else:
                     self.ids.layout.add_widget(
                         TaskSpanSpacer(square_width=self.square_width,
                                        square_height=self.square_height))
+            indexed = elements[len(elements)//2]
+            indexed.index = str(self.task.get_consumed_resources())
+            indexed.do_have_index = True
         else:
             element = TaskSpanElement(square_width=self.square_width,
                                       square_height=self.square_height,
                                       gradient_colors=self.gradient_colors,
-                                      hour_span=self.get_current_span("hour"))
+                                      hour_span=self.get_current_span("hour"),
+                                      index=str(
+                                          self.task.get_consumed_resources()),
+                                      do_have_index=True)
             self.ids.layout.add_widget(element)
 
     def draw_continue_arrow(self, *args):
@@ -1533,7 +1567,7 @@ class TaskSpan(DiscreteMovableBehavior, RelativeLayout, TaskTooltiped):
 
         begin_gradient_colors = self.gradient_colors[0]
         durations_acc = 0
-        for i, element in enumerate(self.ids.layout.children[::-1]):
+        for i, element in enumerate(self.ids.layout.children):
             if isinstance(element, TaskSpanElement):
                 durations_acc += self.durations_span[i]
                 t = durations_acc / self.task.duration.get_duration()

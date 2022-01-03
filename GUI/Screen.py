@@ -220,8 +220,7 @@ class PlanningScreen(Screen):
                     fixed_begin_times.append(None)
             else:
                 pert_copy.remove_vertex(v)
-        print(min_begin_times)
-        print(fixed_begin_times)
+
         # Update total hours and horizon
         self.app.manager.set_total_hours(sum(durations))
         horizon = int(

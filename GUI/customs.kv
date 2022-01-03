@@ -85,8 +85,8 @@
             bar_margin: 0
             icon: res+'task.png'
             text: root.task.name if root.task else ''
-            font_size: 32
-            icon_size: 32, 32
+            font_size: 20
+            icon_size: 24, 24
 
             gradient_colors: root.gradient_colors
         
@@ -943,11 +943,6 @@
         size_hint: None, None
         size: self.minimum_width, root.square_height
 
-    SquareIndex:
-        index: str(root.task.get_consumed_resources())
-        text_color: (1.0, 1.0, 1.0, 1.0)
-        bg_color: (0.2, 0.2, 0.2, 0.8)
-        pos_hint: {'center_x': 0.5, 'center_y': 0.5}
 <TaskSpanSpacer>:
     size_hint: (None, None)
     size: self.square_width, self.square_height
