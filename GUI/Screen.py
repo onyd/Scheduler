@@ -338,6 +338,9 @@ class PlanningScreen(Screen):
         FileManager.delete_file(left_path)
         FileManager.delete_file(right_path)
 
+    def change_cursor_visibility(self, *args):
+        self.scrollable_planning.show_time_cursor = not self.scrollable_planning.show_time_cursor
+
     def on_pre_enter(self):
 
         self.app.tool_bar.left_action_items = [[
@@ -351,6 +354,7 @@ class PlanningScreen(Screen):
             self.scrollable_planning.load()
 
         self.app.tool_bar.right_action_items = [
+            ['eye-off', self.change_cursor_visibility],
             ['sort', lambda x: self.app.manager.sort_tasks_by_begin_time()],
             ['check-outline', update_planning],
             ['content-save', lambda x: self.app.manager.save()],

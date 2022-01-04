@@ -975,6 +975,7 @@ class ScrollablePlanning(FloatLayout):
     tasks_height = NumericProperty(10)
     planning_unit = StringProperty("day")
     n_waiting_for_treatment = NumericProperty(0)
+    show_time_cursor = BooleanProperty(True)
 
     cursor = ObjectProperty()
 
@@ -991,9 +992,11 @@ class ScrollablePlanning(FloatLayout):
             if task.state == "waiting_for_treatment":
                 self.n_waiting_for_treatment += 1
 
-        self.bind(n_waiting_for_treatment=self.update_planning_state)
+        self.bind(n_waiting_for_treatment=self.update_planning_state,
+                  show_time_cursor=lambda *args: self.setup_cursor(self.app.manager.get_current_date()))
         self.app.manager.planning.bind(planning_state=self.update_cursor,
                                        totals_hours=self.update_cursor)
+        self.setup_cursor(self.app.manager.get_current_date())
 
     def update_week_days(self, *args):
         self.ids.planning_grid.colored_columns = []
@@ -1018,26 +1021,29 @@ class ScrollablePlanning(FloatLayout):
             self.app.manager.set_planning_state("waiting_for_treatment")
 
     def setup_cursor(self, date):
-        self.cursor = TimeCursor(size_hint=(None, None),
-                                 gradient_colors=[(0.8, 0.2, 0.1, 0.6),
-                                                  (0.2, 0.2, 0.4, 0.6)],
-                                 size=(self.chunk_size,
-                                       self.ids.planning_grid.height),
-                                 buttons_width=self.chunk_size,
-                                 buttons_height=self.chunk_size,
-                                 x_step=self.chunk_size,
-                                 pos_hint={'top': 1})
-        self.update_cursor()
+        if self.show_time_cursor:
+            self.cursor = TimeCursor(size_hint=(None, None),
+                                     gradient_colors=[(0.8, 0.2, 0.1, 0.6),
+                                                      (0.2, 0.2, 0.4, 0.6)],
+                                     size=(self.chunk_size,
+                                           self.ids.planning_grid.height),
+                                     buttons_width=self.chunk_size,
+                                     buttons_height=self.chunk_size,
+                                     x_step=self.chunk_size,
+                                     pos_hint={'top': 1})
+            self.update_cursor()
 
-        # Add the cusor in the backgroud
-        self.ids.planning_layout.add_widget(self.cursor)
+            # Add the cusor in the backgroud
+            self.ids.planning_layout.add_widget(self.cursor)
 
-        self.cursor.set_cursor(
-            (date -
-             self.app.manager.get_project_begin_date()).get_duration("day"))
-        self.cursor.bind(cursor_position=lambda *args: self.app.manager.
-                         get_planning_screen().update_planning_state())
-        self.ids.planning_grid.bind(height=self.cursor.setter('height'))
+            self.cursor.set_cursor(
+                (date -
+                 self.app.manager.get_project_begin_date()).get_duration("day"))
+            self.cursor.bind(cursor_position=lambda *args: self.app.manager.
+                             get_planning_screen().update_planning_state())
+            self.ids.planning_grid.bind(height=self.cursor.setter('height'))
+        elif self.cursor:
+            self.ids.planning_layout.remove_widget(self.cursor)
 
     def set_times(self, start_date, end_date):
         self.ids.time_layout.clear_widgets()
@@ -1105,8 +1111,6 @@ class ScrollablePlanning(FloatLayout):
     def load(self, unit='day'):
         self.ids.time_layout.clear_widgets()
         self.ids.planning_grid.clear_widgets()
-        if self.cursor:
-            self.ids.planning_layout.remove_widget(self.cursor)
         self.planning_unit = unit
 
         if self.planning_unit == "day":
@@ -1123,7 +1127,7 @@ class ScrollablePlanning(FloatLayout):
                     planning_unit=self.planning_unit,
                     task=task)
 
-            self.setup_cursor(self.app.manager.get_current_date())
+            self.show_time_cursor = True
         else:
             self.ids.unit_switch.switch("hour")
             date = datetime.datetime.combine(
@@ -1144,6 +1148,7 @@ class ScrollablePlanning(FloatLayout):
                         self.app.manager.get_day_duration(),
                         planning_unit=self.planning_unit,
                         task=task)
+            self.show_time_cursor = False
         self.update_week_days()
 
 
