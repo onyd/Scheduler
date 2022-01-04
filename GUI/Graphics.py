@@ -10,7 +10,8 @@ class Gradient:
     @staticmethod
     def horizontal(*args):
         texture = Texture.create(size=(len(args), 1), colorfmt='rgba')
-        buf = bytes([int(v * 255) for v in chain(*args)])  # flattens
+        buf = bytes([max(0, min(int(v * 255), 255))
+                     for v in chain(*args)])  # flattens
 
         texture.blit_buffer(buf, colorfmt='rgba', bufferfmt='ubyte')
         return texture
@@ -18,7 +19,8 @@ class Gradient:
     @staticmethod
     def vertical(*args):
         texture = Texture.create(size=(1, len(args)), colorfmt='rgba')
-        buf = bytes([int(v * 255) for v in chain(*args)])  # flattens
+        buf = bytes([max(0, min(int(v * 255), 255))
+                     for v in chain(*args)])  # flattens
         texture.blit_buffer(buf, colorfmt='rgba', bufferfmt='ubyte')
         return texture
 
@@ -48,5 +50,5 @@ class Gradient:
 
     @staticmethod
     def poly_interpolation(a, b, t):
-        c = 6 * t**5 - 15 * t**4 + 10 * t**3  #(1-np.cos(np.pi*t))/2
+        c = 6 * t**5 - 15 * t**4 + 10 * t**3  # (1-np.cos(np.pi*t))/2
         return (1 - c) * a + c * b

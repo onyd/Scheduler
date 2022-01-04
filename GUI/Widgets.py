@@ -403,7 +403,6 @@ class Component(SelectDragBehavior, BoxLayout, SerializableObject,
         # the current selected componet will be pre selected
         if self.selected:
             igniter.pre_selected = self
-            self.draw_selection_box()
 
     def edit_mode(self, igniter, mode):
         self.mode = mode
@@ -471,7 +470,7 @@ class DialogSheetView(SheetView):
 
 
 class CheckableChip(MDChip):
-    active = BooleanProperty()
+    active = BooleanProperty(False)
 
     def on_press(self):
         self.active = not self.active
@@ -510,7 +509,6 @@ class Task(Component):
 
         self.name = name
         self.resource = resource
-        Clock.schedule_once(lambda x: self.set_duration(duration, force=True))
         self.begin_date = begin_date
         self.max_end_date = max_end_date
         self.min_begin_date = min_begin_date
@@ -520,12 +518,13 @@ class Task(Component):
         self.prev_state = self.state
         self.fixed = fixed
 
-        Clock.schedule_once(self.setup)
+        Clock.schedule_once(lambda *args: self.setup(duration))
 
-    def setup(self, *args):
+    def setup(self, duration):
         self.bind(activated=self.set_gradient_colors,
                   state=self.update_treatment,
                   fixed=self.draw_fixed_frame,
+                  pos=self.draw_fixed_frame,
                   duration=self.update_duration_fields)
         self.bind(pos=lambda *args: self.app.manager.set_saved(False),
                   name=lambda *args: self.app.manager.set_saved(False),
@@ -546,6 +545,7 @@ class Task(Component):
                   max_end_date=self.update_planning_state,
                   activated=self.update_planning_state,
                   state=self.update_planning_state)
+        self.set_duration(duration, force=True)
 
         # Duration/resource binds
         self.ids.day_text_field.bind(text=self.update_duration)
@@ -577,8 +577,8 @@ class Task(Component):
 
     def update_duration_fields(self, *args):
         day, hour = self.duration.get_duration("split")
-        self.ids.day_text_field.text = str(day)
-        self.ids.hour_text_field.text = str(hour)
+        self.ids.day_text_field.input_text = str(day)
+        self.ids.hour_text_field.input_text = str(hour)
 
     def update_resource(self, instance, value):
         if value != "":
@@ -643,7 +643,7 @@ class Task(Component):
         self.canvas.after.remove_group("fixed_frame")
         if self.fixed:
             with self.canvas.after:
-                Color(0.0, 0.0, 0.0)
+                Color(0.5, 0.1, 0.3)
                 Line(rectangle=[*self.pos, *self.size],
                      width=2,
                      group="fixed_frame")
@@ -689,16 +689,18 @@ class Task(Component):
 
     def on_touch_down(self, touch):
         if touch.is_double_tap and self.collide_point(*touch.pos):
-            description_field = TextInput(multiline=True)
-            description_field.text = self.description
+            content = EditTaskDialogContent()
+            content.ids.description_input.text = self.description
+            content.ids.name_text_field.input_text = self.name
 
             def on_validate(*args):
-                self.description = description_field.text
+                self.name = content.ids.name_text_field.text
+                self.description = content.ids.description_input.text
                 sheetview.dismiss()
 
             sheetview = DialogSheetView(
-                title='Description',
-                content=description_field,
+                title='Edit task',
+                content=content,
                 on_validate=on_validate,
                 on_cancel=lambda x: sheetview.dismiss(),
                 size_hint=(0.8, 0.8))
@@ -720,7 +722,7 @@ class Task(Component):
         if strict:
             return date < self.get_end_date()
         else:
-            return date < self.get_end_date().floored()
+            return date < (self.get_end_date() - TaskDelta(1)).floored()
 
     def get_begin_date(self):
         return self.begin_date
@@ -735,13 +737,13 @@ class Task(Component):
         return self.duration
 
     def set_duration(self, duration: TaskDelta, force=False):
-        if not force and (self.fixed or self.state == "done"):
+        if not force and self.state == "done":
             return
 
         self.duration = duration
 
     def add_duration(self, duration: TaskDelta, force=False):
-        if not force and (self.fixed or self.state == "done"):
+        if not force and self.state == "done":
             return
 
         self.duration += duration
@@ -794,6 +796,10 @@ class Task(Component):
                                fixed=self.fixed,
                                assignments=self.assignments,
                                **kwargs)
+
+
+class EditTaskDialogContent(BoxLayout):
+    pass
 
 
 class StartTask(Component):
@@ -1104,6 +1110,7 @@ class ScrollablePlanning(FloatLayout):
         self.planning_unit = unit
 
         if self.planning_unit == "day":
+            self.ids.unit_switch.switch("day")
             self.set_times(self.app.manager.get_project_begin_date().date,
                            self.app.manager.get_project_end_date().date)
 
@@ -1118,9 +1125,10 @@ class ScrollablePlanning(FloatLayout):
 
             self.setup_cursor(self.app.manager.get_current_date())
         else:
+            self.ids.unit_switch.switch("hour")
             date = datetime.datetime.combine(
                 self.app.manager.get_project_begin_date().date +
-                datetime.timedelta(days=self.cursor.cursor_position * 7),
+                datetime.timedelta(days=self.cursor.cursor_position),
                 datetime.datetime.min.time())
             self.set_times(
                 date, date +
@@ -1442,7 +1450,6 @@ class TaskSpan(DiscreteMovableBehavior, RelativeLayout, TaskTooltiped):
         Clock.schedule_once(self.setup)
 
     def setup(self, *args):
-        self.set_gradient_colors()
         self.task.bind(state=self.set_gradient_colors,
                        description=self.setter('tooltip_txt'),
                        duration=self.build,
@@ -1463,7 +1470,7 @@ class TaskSpan(DiscreteMovableBehavior, RelativeLayout, TaskTooltiped):
         self.update_tooltip()
         self.build()
         self.draw_continue_arrow()
-        self.draw_fixed_frame()
+        Clock.schedule_once(self.draw_fixed_frame)
 
     def update_do_move_x(self, *args):
         self.do_move_x = not (self.task.state == "done" or self.task.fixed)
@@ -1496,6 +1503,7 @@ class TaskSpan(DiscreteMovableBehavior, RelativeLayout, TaskTooltiped):
                      self.app.manager.get_day_duration()))]
 
     def build(self, *args):
+        self.gradient_colors = self.task.get_state_gradient_colors()
         self.durations_span = self.task.get_durations_span()
         self.ids.layout.clear_widgets()
 
@@ -1531,7 +1539,8 @@ class TaskSpan(DiscreteMovableBehavior, RelativeLayout, TaskTooltiped):
             element = TaskSpanElement(square_width=self.square_width,
                                       square_height=self.square_height,
                                       gradient_colors=self.gradient_colors,
-                                      hour_span=self.get_current_span("hour"),
+                                      hour_span=self.get_current_span(
+                                          "hour"),
                                       index=str(
                                           self.task.get_consumed_resources()),
                                       do_have_index=True)
@@ -1557,7 +1566,7 @@ class TaskSpan(DiscreteMovableBehavior, RelativeLayout, TaskTooltiped):
         self.canvas.after.remove_group("fixed_frame")
         if self.task.fixed:
             with self.canvas.after:
-                Color(0.0, 0.0, 0.0)
+                Color(0.5, 0.1, 0.3)
                 Line(rectangle=[*self.pos, *self.size],
                      width=2,
                      group="fixed_frame")
@@ -1567,7 +1576,7 @@ class TaskSpan(DiscreteMovableBehavior, RelativeLayout, TaskTooltiped):
 
         begin_gradient_colors = self.gradient_colors[0]
         durations_acc = 0
-        for i, element in enumerate(self.ids.layout.children):
+        for i, element in enumerate(self.ids.layout.children[::-1]):
             if isinstance(element, TaskSpanElement):
                 durations_acc += self.durations_span[i]
                 t = durations_acc / self.task.duration.get_duration()

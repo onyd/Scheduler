@@ -25,7 +25,7 @@ class PlanningData(SerializableObject, EventDispatcher):
                  project_begin_date: TaskDate,
                  project_end_date: TaskDate,
                  current_date: TaskDate,
-                 planning_state="up_to_date",
+                 planning_state="to_validate",
                  totals_hours=[]):
         self.name = name
         self.pert = pert

@@ -49,7 +49,6 @@ class DiscreteDragBehavior(object):
             touch.ud[self._get_uid('svavoid')] = True
             return super(DiscreteDragBehavior, self).on_touch_down(touch)
 
-
         if self._drag_touch or ('button' in touch.profile and
                                 touch.button.startswith('scroll')) or\
                 not ((xx < x <= xx + w) and (yy < y <= yy + h)):
@@ -336,18 +335,19 @@ class SelectDragBehavior(object):
 
     def unselect(self):
         self.selected = False
-        self.canvas.before.clear()
+        self.canvas.remove_group("selection_box")
         self._drag_touch = None
 
-    def draw_selection_box(self, margin=3):
+    def draw_selection_box(self, line_width=4):
         if not self.selected:
             return
-        self.canvas.before.clear()
-        with self.canvas.before:
+        self.canvas.remove_group("selection_box")
+        with self.canvas:
             Color(*self.selection_frame_color)
-            Line(rectangle=(self.x - margin, self.y - margin,
-                            self.width + 2 * margin, self.height + 2 * margin),
-                 width=margin)
+            Line(rectangle=(self.x - line_width, self.y - line_width,
+                            self.width + 2 * line_width, self.height + 2 * line_width),
+                 width=line_width,
+                 group="selection_box")
 
     def handle_collisions(self, dx=0, dy=0):
         new_dx, new_dy = dx, dy
@@ -395,7 +395,6 @@ class SelectDragBehavior(object):
             touch.ud[self._get_uid('svavoid')] = True
             return super(SelectDragBehavior, self).on_touch_down(touch)
 
-
         if self._drag_touch or ('button' in touch.profile and
                                 touch.button.startswith('scroll')) or\
                 not ((xx < x <= xx + w) and (yy < y <= yy + h)):
@@ -420,7 +419,7 @@ class SelectDragBehavior(object):
             return super(SelectDragBehavior, self).on_touch_move(touch)
 
         if self._get_uid('svavoid') in touch.ud or\
-                (self._drag_touch is not None and self._drag_touch is not touch)or not self.sdb_enabled:
+                (self._drag_touch is not None and self._drag_touch is not touch) or not self.sdb_enabled:
             return super(SelectDragBehavior, self).on_touch_move(touch) or\
                 self._get_uid() in touch.ud
 

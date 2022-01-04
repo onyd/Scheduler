@@ -30,7 +30,7 @@ class ProjectsListScreen(Screen):
                 content.ids.name_field.text,
                 int(content.ids.capacity_field.text),
                 int(content.ids.day_duration_field.text), [
-                    i for i, day_chip in enumerate(
+                    len(content.ids.day_chips_layout.children)-i-1 for i, day_chip in enumerate(
                         content.ids.day_chips_layout.children)
                     if day_chip.active
                 ])

@@ -6,12 +6,13 @@ import datetime
 class TaskDate(SerializableObject):
     """Represents a task date relative to project begin date and allow conversion between theoretical time domain and real time domain (with work free days)
     """
+
     def __init__(self, date_str: str, hour: int, **kwargs):
+        self.app = MDApp.get_running_app()
+
         super().__init__(**kwargs)
         self.date = datetime.date.fromisoformat(date_str)
         self.hour = hour
-
-        self.app = MDApp.get_running_app()
 
     @classmethod
     def from_date(cls, date: datetime.date, hour: int):
@@ -121,6 +122,7 @@ class TaskDate(SerializableObject):
 class TaskDelta(SerializableObject):
     """Represents a task time variation
     """
+
     def __init__(self, hours: int, **kwargs):
         super().__init__(**kwargs)
         self.hours = hours

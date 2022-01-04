@@ -396,11 +396,7 @@
             width: 2
             rectangle: (self.x, self.y, self.width, self.height)
 
-    
-
 <Task>:
-    text: 'Task'
-    name: name_text_field.text
     chip_callback_on: self.callback_on
     chip_callback_off: self.callback_off
     selected_button: 'on' if self.activated else 'off'
@@ -420,7 +416,7 @@
         id: bar
         bar_margin: root.bar_margin
         icon: res+root.icon
-        text: root.text
+        text: root.name
         switch_size: 100, 30
         chip_callback_on: root.chip_callback_on
         chip_callback_off: root.chip_callback_off
@@ -428,15 +424,7 @@
 
         gradient_colors: root.gradient_colors
 
-    LabeledTextField:
-        id: name_text_field
-        label_text: 'Name:'
-        input_text: root.name
-        hint_text: 'text'
-        bg_color: app.theme_cls.primary_color
-        
-        size_hint_x: 0.9
-        pos_hint: {'center_x': 0.5}
+    
         
     LabeledTextField:
         id: resource_text_field
@@ -446,7 +434,7 @@
         bg_color: app.theme_cls.primary_color
         input_filter: 'int'
 
-        disabled: root.state == 'done' or root.fixed
+        disabled: root.state == 'done'
         
         size_hint_x: 0.9
         pos_hint: {'center_x': 0.5}
@@ -465,8 +453,7 @@
             bg_color: app.theme_cls.primary_color
             input_filter: 'int'
 
-            disabled: root.state == 'done' or root.fixed
-
+            disabled: root.state == 'done' 
             size_hint_x: 0.5
 
         LabeledTextField:
@@ -476,67 +463,128 @@
             bg_color: app.theme_cls.primary_color
             input_filter: 'int'
 
-            disabled: root.state == 'done' or root.fixed
-
+            disabled: root.state == 'done' 
             size_hint_x: 0.5
     
     BoxLayout:
+        id: min_begin_date_layout
         orientation: 'horizontal'
         size_hint: 0.9, None
         height: self.minimum_height
         pos_hint: {'center_x': 0.5}
         spacing: root.margin
 
-        MDFillRoundFlatButton:
-            id: min_begin_date_picker_button
-            text: str(root.min_begin_date) if root.min_begin_date else "-"
-            md_bg_color: app.theme_cls.primary_color
-            radius: [1, ]
-            
-            disabled: root.state == 'done' or root.fixed
+        RoundedRectangleLabel:
+            id: min_begin_date_label
+            text: 'Begin before:'
+            color: 0.0, 0.0, 0.0
+            size_hint: None, 1
+            width: self.texture_size[0]
+            pos_hint: {'center_y': 0.5}
 
-            size_hint: 0.6, None
-            height: 32
+            bg_color: app.theme_cls.primary_color
 
-        MDFillRoundFlatButton:
-            id: min_begin_date_reset_button
-            text: "Reset"
-            md_bg_color: app.theme_cls.primary_color
-            radius: [1, ]
-            
-            disabled: root.state == 'done' or root.fixed
+        BoxLayout:
+            size_hint: None, None
+            size: min_begin_date_layout.width-min_begin_date_label.width, self.minimum_height
 
-            size_hint: 0.4, None
-            height: 32
+            MDFillRoundFlatButton:
+                id: min_begin_date_picker_button
+                text: str(root.min_begin_date) if root.min_begin_date else "-"
+                md_bg_color: app.theme_cls.primary_color
+                radius: [1, ]
+                
+                disabled: root.state == 'done' or root.fixed
+
+                size_hint: 0.6, None
+                height: 32
+
+            MDFillRoundFlatButton:
+                id: min_begin_date_reset_button
+                text: "Reset"
+                md_bg_color: app.theme_cls.primary_color
+                radius: [1, ]
+                
+                disabled: root.state == 'done' or root.fixed
+
+                size_hint: 0.4, None
+                height: 32
 
     BoxLayout:
+        id: max_end_date_layout
         orientation: 'horizontal'
         size_hint: 0.9, None
         height: self.minimum_height
         pos_hint: {'center_x': 0.5}
         spacing: root.margin
 
-        MDFillRoundFlatButton:
-            id: max_end_date_picker_button
-            text: str(root.max_end_date) if root.max_end_date else "-"
-            md_bg_color: app.theme_cls.primary_color
-            radius: [1, ]
-            
-            disabled: root.state == 'done' or root.fixed
+        RoundedRectangleLabel:
+            id: max_end_date_label
+            text: 'End after:'
+            color: 0.0, 0.0, 0.0
+            size_hint: None, 1
+            width: self.texture_size[0]
+            pos_hint: {'center_y': 0.5}
 
-            size_hint: 0.6, None
+            bg_color: app.theme_cls.primary_color
+
+        BoxLayout:
+            size_hint: None, None
+            size: max_end_date_layout.width-max_end_date_label.width, self.minimum_height
+
+            MDFillRoundFlatButton:
+                id: max_end_date_picker_button
+                text: str(root.max_end_date) if root.max_end_date else "-"
+                md_bg_color: app.theme_cls.primary_color
+                radius: [1, ]
+                
+                disabled: root.state == 'done' or root.fixed
+
+                size_hint: 0.6, None
+                height: 32
+
+            MDFillRoundFlatButton:
+                id: max_end_date_reset_button
+                text: "Reset"
+                md_bg_color: app.theme_cls.primary_color
+                radius: [1, ]
+                
+                disabled: root.state == 'done' or root.fixed
+
+                size_hint: 0.4, None
+                height: 32
+
+<EditTaskDialogContent>:
+    orientation: 'vertical'
+
+    LabeledTextField:
+        id: name_text_field
+        label_text: 'Name:'
+        hint_text: 'text'
+        bg_color: app.theme_cls.primary_color
+        
+        size_hint_x: 0.9
+        pos_hint: {'center_x': 0.5}
+
+    BoxLayout:
+        orientation: 'vertical'
+        size_hint_x: 0.9
+        pos_hint: {'center_x': 0.5}
+
+        MDLabel: 
+            id: description_label
+            text: 'Description'
+            size_hint: (1, None)
             height: 32
+            font_style: 'H6'
+            pos_hint: {'top': 1, 'left': 0}
 
-        MDFillRoundFlatButton:
-            id: max_end_date_reset_button
-            text: "Reset"
-            md_bg_color: app.theme_cls.primary_color
-            radius: [1, ]
-            
-            disabled: root.state == 'done' or root.fixed
+        TextInput:
+            id: description_input
+            multiline: True
+            size_hint: 1, None
+            height: root.height-name_text_field.height-description_label.height
 
-            size_hint: 0.4, None
-            height: 32
 
 <DialogSheetView>:
     radius: [14, 14, 14, 14]
@@ -596,13 +644,13 @@
     BoxLayout:
         MDTextField:
             id: prolongation_field
-            disabled: root.task.fixed or root.task.state == "done"
+            disabled: root.task.state == "done"
             hint_text: "Prolongation"
 
         CustomSwitch:
             id: unit_switch
             selected: root.unit
-            disabled: root.task.fixed or root.task.state == "done" 
+            disabled: root.task.state == "done" 
 
             size_hint: None, None
             size: 90, 30
@@ -1036,6 +1084,18 @@
             pos: self.pos
             size: self.size
             radius: root.radius
+
+<RoundedRectangleLabel@Label>:
+    bg_color: (1., 1., 1., 1)
+    
+    canvas.before:
+        Color:
+            rgba: root.bg_color
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [6, ]
+
 <LabeledTextField@RelativeLayout>:
     label_text: ''
     input_text: ''
