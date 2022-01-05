@@ -385,7 +385,7 @@
 
     pos: root.pos
     size_hint: None, None
-    size: self.minimum_size
+    height: self.minimum_height
 
     drag_rectangle: self.x, self.y, self.width, self.height
 
@@ -403,6 +403,8 @@
     icon: 'task.png'
     bar_height: bar.height
     spacing: root.margin
+
+    width: bar.width
 
     canvas:
         Color:
@@ -423,8 +425,6 @@
         selected_button: root.selected_button
 
         gradient_colors: root.gradient_colors
-
-    
         
     LabeledTextField:
         id: resource_text_field
@@ -448,6 +448,7 @@
         
         LabeledTextField:
             id: day_text_field
+            text: str(root.duration.get_duration("split")[0]) if root.duration else ''
             label_text: 'Day:'
             hint_text: 'integer'
             bg_color: app.theme_cls.primary_color
@@ -458,6 +459,7 @@
 
         LabeledTextField:
             id: hour_text_field
+            text: str(root.duration.get_duration("split")[1]) if root.duration else ''
             label_text: 'Hour:'
             hint_text: 'integer'
             bg_color: app.theme_cls.primary_color
@@ -476,7 +478,7 @@
 
         RoundedRectangleLabel:
             id: min_begin_date_label
-            text: 'Begin before:'
+            text: 'Begin after:'
             color: 0.0, 0.0, 0.0
             size_hint: None, 1
             width: self.texture_size[0]
@@ -485,6 +487,7 @@
             bg_color: app.theme_cls.primary_color
 
         BoxLayout:
+            id: min_begin_date_picker_layout
             size_hint: None, None
             size: min_begin_date_layout.width-min_begin_date_label.width, self.minimum_height
 
@@ -496,8 +499,8 @@
                 
                 disabled: root.state == 'done' or root.fixed
 
-                size_hint: 0.6, None
-                height: 32
+                size_hint: None, None
+                size: min_begin_date_picker_layout.width * 0.6, 32
 
             MDFillRoundFlatButton:
                 id: min_begin_date_reset_button
@@ -507,8 +510,8 @@
                 
                 disabled: root.state == 'done' or root.fixed
 
-                size_hint: 0.4, None
-                height: 32
+                size_hint: None, None
+                size: min_begin_date_picker_layout.width * 0.4, 32
 
     BoxLayout:
         id: max_end_date_layout
@@ -520,7 +523,7 @@
 
         RoundedRectangleLabel:
             id: max_end_date_label
-            text: 'End after:'
+            text: 'End before:'
             color: 0.0, 0.0, 0.0
             size_hint: None, 1
             width: self.texture_size[0]
@@ -529,6 +532,7 @@
             bg_color: app.theme_cls.primary_color
 
         BoxLayout:
+            id: max_end_date_picker_layout
             size_hint: None, None
             size: max_end_date_layout.width-max_end_date_label.width, self.minimum_height
 
@@ -540,8 +544,8 @@
                 
                 disabled: root.state == 'done' or root.fixed
 
-                size_hint: 0.6, None
-                height: 32
+                size_hint: None, None
+                size: max_end_date_picker_layout.width * 0.6, 32
 
             MDFillRoundFlatButton:
                 id: max_end_date_reset_button
@@ -551,20 +555,32 @@
                 
                 disabled: root.state == 'done' or root.fixed
 
-                size_hint: 0.4, None
-                height: 32
+                size_hint: None, None
+                size: max_end_date_picker_layout.width * 0.4, 32
 
 <EditTaskDialogContent>:
     orientation: 'vertical'
 
-    LabeledTextField:
-        id: name_text_field
-        label_text: 'Name:'
-        hint_text: 'text'
-        bg_color: app.theme_cls.primary_color
-        
-        size_hint_x: 0.9
+    BoxLayout:
+        id: name_layout
+        orientation: 'vertical'
+        size_hint: 0.9, None
+        height: self.minimum_height
         pos_hint: {'center_x': 0.5}
+
+        MDLabel: 
+            id: name_label
+            text: 'Name'
+            size_hint: (1, None)
+            height: 32
+            font_style: 'H6'
+            pos_hint: {'top': 1, 'left': 0}
+
+        TextInput:
+            id: name_input
+            multiline: False
+            size_hint: 1, None
+            height: 32
 
     BoxLayout:
         orientation: 'vertical'
@@ -583,7 +599,7 @@
             id: description_input
             multiline: True
             size_hint: 1, None
-            height: root.height-name_text_field.height-description_label.height
+            height: root.height-name_layout.height-description_label.height
 
 
 <DialogSheetView>:
@@ -730,8 +746,10 @@
     text: 'Start'
     gradient_colors: [(0.8, 0., 0., 0.5), (0.2, 0.2, 0.7, 0.5)]
     icon: 'task.png'
+    width: bar.width
 
     GradientComponentBar:
+        id: bar
         bar_margin: root.bar_margin
         icon: res+root.icon
         text: root.text
@@ -742,8 +760,10 @@
     text: 'End'
     gradient_colors: [(0.8, 0., 0., 0.5), (0.2, 0.2, 0.7, 0.5)]
     icon: 'task.png'
+    width: bar.width
 
     GradientComponentBar:
+        id: bar
         bar_margin: root.bar_margin
         icon: res+root.icon
         text: root.text
@@ -1098,7 +1118,7 @@
 
 <LabeledTextField@RelativeLayout>:
     label_text: ''
-    input_text: ''
+    text: ''
     hint_text: ''
     input_filter: None
     size_hint_y: None 
@@ -1131,7 +1151,7 @@
         multiline: False 
         input_filter: root.input_filter
         background_color: (1., 1., 1., 0)
-        text: root.input_text
+        text: root.text
         hint_text: root.hint_text
         font_size: 22
         

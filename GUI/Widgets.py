@@ -377,7 +377,7 @@ class StateIcon(RelativeLayout, Tooltipped):
             self.state = state
 
 
-class Component(SelectDragBehavior, BoxLayout, SerializableObject,
+class Component(BoxLayout, SelectDragBehavior, SerializableObject,
                 AntiCollisionObject):
     icon = StringProperty("message_bubble.png")
     selected_button = StringProperty()
@@ -507,7 +507,6 @@ class Task(Component):
                  **kwargs):
         super().__init__(**kwargs)
 
-        self.name = name
         self.resource = resource
         self.begin_date = begin_date
         self.max_end_date = max_end_date
@@ -518,14 +517,13 @@ class Task(Component):
         self.prev_state = self.state
         self.fixed = fixed
 
-        Clock.schedule_once(lambda *args: self.setup(duration))
+        Clock.schedule_once(lambda *args: self.setup(name, duration))
 
-    def setup(self, duration):
+    def setup(self, name, duration):
         self.bind(activated=self.set_gradient_colors,
                   state=self.update_treatment,
                   fixed=self.draw_fixed_frame,
-                  pos=self.draw_fixed_frame,
-                  duration=self.update_duration_fields)
+                  pos=self.draw_fixed_frame,)
         self.bind(pos=lambda *args: self.app.manager.set_saved(False),
                   name=lambda *args: self.app.manager.set_saved(False),
                   resource=lambda *args: self.app.manager.set_saved(False),
@@ -564,6 +562,7 @@ class Task(Component):
 
         self.set_gradient_colors()
         self.draw_fixed_frame()
+        self.name = name
 
     def update_duration(self, *args):
         day = self.ids.day_text_field.text
@@ -574,11 +573,6 @@ class Task(Component):
         if hour != "":
             duration.add_duration(int(hour), unit="hour")
         self.set_duration(duration)
-
-    def update_duration_fields(self, *args):
-        day, hour = self.duration.get_duration("split")
-        self.ids.day_text_field.input_text = str(day)
-        self.ids.hour_text_field.input_text = str(hour)
 
     def update_resource(self, instance, value):
         if value != "":
@@ -691,10 +685,10 @@ class Task(Component):
         if touch.is_double_tap and self.collide_point(*touch.pos):
             content = EditTaskDialogContent()
             content.ids.description_input.text = self.description
-            content.ids.name_text_field.input_text = self.name
+            content.ids.name_input.text = self.name
 
             def on_validate(*args):
-                self.name = content.ids.name_text_field.text
+                self.name = content.ids.name_input.text
                 self.description = content.ids.description_input.text
                 sheetview.dismiss()
 
@@ -977,7 +971,7 @@ class ScrollablePlanning(FloatLayout):
     n_waiting_for_treatment = NumericProperty(0)
     show_time_cursor = BooleanProperty(True)
 
-    cursor = ObjectProperty()
+    cursor = ObjectProperty(allownone=True)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -1021,7 +1015,7 @@ class ScrollablePlanning(FloatLayout):
             self.app.manager.set_planning_state("waiting_for_treatment")
 
     def setup_cursor(self, date):
-        if self.show_time_cursor:
+        if self.planning_unit == "day" and self.show_time_cursor and not self.cursor:
             self.cursor = TimeCursor(size_hint=(None, None),
                                      gradient_colors=[(0.8, 0.2, 0.1, 0.6),
                                                       (0.2, 0.2, 0.4, 0.6)],
@@ -1044,6 +1038,7 @@ class ScrollablePlanning(FloatLayout):
             self.ids.planning_grid.bind(height=self.cursor.setter('height'))
         elif self.cursor:
             self.ids.planning_layout.remove_widget(self.cursor)
+            self.cursor = None
 
     def set_times(self, start_date, end_date):
         self.ids.time_layout.clear_widgets()
@@ -1107,6 +1102,7 @@ class ScrollablePlanning(FloatLayout):
         self.ids.planning_grid.clear_widgets()
         if self.cursor:
             self.ids.planning_layout.remove_widget(self.cursor)
+            self.cursor = None
 
     def load(self, unit='day'):
         self.ids.time_layout.clear_widgets()
