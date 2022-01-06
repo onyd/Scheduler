@@ -573,14 +573,14 @@ class GraphEditorScreen(Screen):
             'arrow-left',
             lambda x: self.app.manager.quit("choose_editor_screen")
         ]]
-        self.app.tool_bar.right_action_items = [[
-            'image-filter-center-focus', lambda x: self.to_center()
-        ]]
+        self.app.tool_bar.right_action_items = [
+            ['file-export', lambda x: self.export_pert()], [
+                'image-filter-center-focus', lambda x: self.to_center()
+            ]]
 
     def set_selection_tool_bar(self, callback):
         self.app.tool_bar.left_action_items = [['arrow-left', callback]]
-        self.app.tool_bar.right_action_items = [
-            ['file-export', lambda x: self.export_pert()]]
+        self.app.tool_bar.right_action_items = []
 
     def on_pre_enter(self):
         """Initialize some widgets and display graph list"""
