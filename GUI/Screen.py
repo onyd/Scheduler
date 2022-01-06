@@ -559,6 +559,10 @@ class GraphEditorScreen(Screen):
         self.set_selection_tool_bar(lambda *args: self.change_mode(None))
         self.hide_action_bar()
 
+    def export_pert(self, *args):
+        self.ids.edit_area.export_to_png(
+            self.app.manager.get_planning_path(extension="_pert.png"))
+
     def on_pre_leave(self, *args):
         """Un load edit_area contents"""
         self.ids.edit_area.content.clear_widgets()
@@ -575,7 +579,8 @@ class GraphEditorScreen(Screen):
 
     def set_selection_tool_bar(self, callback):
         self.app.tool_bar.left_action_items = [['arrow-left', callback]]
-        self.app.tool_bar.right_action_items = []
+        self.app.tool_bar.right_action_items = [
+            ['file-export', lambda x: self.export_pert()]]
 
     def on_pre_enter(self):
         """Initialize some widgets and display graph list"""
