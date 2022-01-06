@@ -416,10 +416,10 @@ class Component(SelectDragBehavior, BoxLayout, SerializableObject,
         if self.collide_point(*touch.pos) and self.mode:
             # add/remove link if predecessor exist or add it and wait for a second touch
             if self.mode == "add_link":
-                self.dispatch("on_add_link", self)
+                self.dispatch("on_add_link")
 
             elif self.mode == "remove_link":
-                self.dispatch("on_remove_link", self)
+                self.dispatch("on_remove_link")
 
         return super().on_touch_down(touch)
 
@@ -1694,19 +1694,18 @@ class Link(FloatLayout):
         w2, h2 = self.end.size
 
         # Compute best orientation
-        if y2 > y1 + h1:
-            self.orientation_x = 0
-            self.orientation_y = 1
-        elif y2 + h2 < y1:
-            self.orientation_x = 0
-            self.orientation_y = -1
-        else:
-            if x2 > x1 + h1:
-                self.orientation_x = 1
-            else:
-                self.orientation_x = -1
-
+        if x2 > x1 + h1:
+            self.orientation_x = 1
             self.orientation_y = 0
+        elif x2 + w2 < x1:
+            self.orientation_x = -1
+            self.orientation_y = 0
+        else:
+            self.orientation_x = 0
+            if y2 > y1 + h1:
+                self.orientation_y = 1
+            else:
+                self.orientation_y = -1
 
         # Get center coords of the corresponding side
         if self.orientation_x == 1:

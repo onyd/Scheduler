@@ -468,7 +468,7 @@ class GraphEditorScreen(Screen):
 
             print("Error: no selected component")
 
-    def add_link(self, _, instance):
+    def add_link(self, instance):
         """Called when mode="add_link" and a component is clicked, add link if two components have been selected else register selection and wait for second call:
             instance: the component object that has been clicked """
         # Take the first selection
@@ -492,7 +492,7 @@ class GraphEditorScreen(Screen):
             self.pre_selected.unselect()
             self.pre_selected = None
 
-    def remove_link(self, _, instance):
+    def remove_link(self, instance):
         """Called when mode="remove_link" and a component is clicked, remove link if two components have been selected else register selection and wait for second call:
             instance: the component object that has been clicked """
         # Take the first selection
