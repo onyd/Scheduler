@@ -456,8 +456,7 @@ class GraphEditorScreen(Screen):
             # Remove all links with its neighbors
             for neighbor in self.app.manager.get_pert().unoriented_neighbors(
                     component):
-                self.app.manager.remove_editor_link(component, neighbor,
-                                                    self.ids.edit_area)
+                self.app.manager.remove_editor_link(component, neighbor)
 
             self.remove_component(component)
 
@@ -482,8 +481,7 @@ class GraphEditorScreen(Screen):
                     self.pre_selected,
                     instance) and not self.app.manager.get_pert().adjacent(
                         instance, self.pre_selected):
-                self.app.manager.add_editor_link(self.pre_selected, instance,
-                                                 self.ids.edit_area)
+                self.app.manager.add_editor_link(self.pre_selected, instance)
                 self.app.manager.set_saved(False)
                 self.app.manager.set_planning_state("to_validate")
                 self.change_mode(None)
@@ -507,16 +505,14 @@ class GraphEditorScreen(Screen):
             if self.app.manager.get_pert().adjacent(self.pre_selected,
                                                     instance):
                 self.app.manager.remove_editor_link(self.pre_selected,
-                                                    instance,
-                                                    self.ids.edit_area)
+                                                    instance)
                 self.app.manager.set_saved(False)
                 self.app.manager.set_planning_state("to_validate")
                 self.change_mode(None)
             elif self.app.manager.get_pert().adjacent(instance,
                                                       self.pre_selected):
                 self.app.manager.remove_editor_link(instance,
-                                                    self.pre_selected,
-                                                    self.ids.edit_area)
+                                                    self.pre_selected)
                 self.app.manager.set_saved(False)
                 self.app.manager.set_planning_state("to_validate")
                 self.change_mode(None)
@@ -592,5 +588,4 @@ class GraphEditorScreen(Screen):
         for component in pert.V:
             self.add_component(component, init=True)
             for neighboor in pert.neighbors(component):
-                self.app.manager.add_editor_link(component, neighboor,
-                                                 self.ids.edit_area)
+                self.app.manager.add_editor_link(component, neighboor)

@@ -16,7 +16,7 @@ class PlanningManager:
     def __init__(self, app, settings):
         self.planning = None
         self.settings = settings
-        self.links = []
+        self.link_container = None
         self.saved = True
         self.app = app
 
@@ -166,7 +166,7 @@ class PlanningManager:
         self.get_planning_screen().scrollable_planning.load()
         self.set_saved(False)
 
-    def add_editor_link(self, begin, end, link_container):
+    def add_editor_link(self, begin, end):
         """Add an oriented link (graph + graphics) :
             begin: the first component
             end: the second component
@@ -174,12 +174,9 @@ class PlanningManager:
             """
         self.get_pert().add_link(begin, end)
 
-        link = Link(begin=begin, end=end)
-        link_container.add_widget(link)
+        self.link_container.add_widget(Link(begin=begin, end=end))
 
-        self.links.append(link)
-
-    def remove_editor_link(self, begin, end, link_container):
+    def remove_editor_link(self, begin, end):
         """Remove link in graph and graphics stuff:
             begin: the first component
             end: the second component
@@ -195,13 +192,12 @@ class PlanningManager:
                 return
 
         # Find graphic link to delete it
-        for link in self.links:
-            if (link.begin, link.end) == (begin, end) or (link.begin,
-                                                          link.end) == (end,
-                                                                        begin):
-                link_container.remove_widget(link)
-                self.links.remove(link)
-                return
+        for link in self.link_container.content.children:
+            if isinstance(link, Link) and ((link.begin, link.end) == (begin, end) or (link.begin,
+                                                                                      link.end) == (end,
+                                                                                                    begin)):
+                self.link_container.remove_widget(link)
+                break
 
     def create(self, name, capacity, day_duration, week_days):
         self.planning = PlanningData(
@@ -251,6 +247,7 @@ class PlanningManager:
         """Shortcut to load the graph:
             name: the graph name to load"""
         self.planning = PlanningData.load_planning_data(name, self.settings)
+        self.link_container = self.app.screen_manager.ids.graph_editor_screen.ids.edit_area
         self.planning.bind(current_date=self.update_task,
                            totals_hours=self.update)
 
@@ -264,7 +261,7 @@ class PlanningManager:
 
     def unload(self):
         self.planning = None
-        self.links = []
+        self.link_container = None
         self.saved = True
         self.n_work_free_days_before_date = None
         self.time_cuts = None
