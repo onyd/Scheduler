@@ -377,7 +377,7 @@ class StateIcon(RelativeLayout, Tooltipped):
             self.state = state
 
 
-class Component(BoxLayout, SelectDragBehavior, SerializableObject,
+class Component(SelectDragBehavior, BoxLayout, SerializableObject,
                 AntiCollisionObject):
     icon = StringProperty("message_bubble.png")
     selected_button = StringProperty()
@@ -479,7 +479,7 @@ class CheckableChip(MDChip):
 
 class Task(Component):
     name = StringProperty("New")
-    begin_date = ObjectProperty()
+    begin_date = ObjectProperty(allownone=True)
     duration = ObjectProperty()
     resource = NumericProperty(1)
     max_end_date = ObjectProperty(allownone=True)
@@ -497,7 +497,7 @@ class Task(Component):
                  name,
                  duration,
                  resource,
-                 begin_date=TaskDate.from_date(datetime.date.today(), 0),
+                 begin_date=None,
                  min_begin_date=None,
                  max_end_date=None,
                  description="",
@@ -743,12 +743,18 @@ class Task(Component):
         self.duration += duration
 
     def get_end_date(self):
+        if self.begin_date is None:
+            return None
+
         durations_span = [
             e if e != 0 else 7 for e in self.get_durations_span()
         ]
         return self.begin_date + TaskDelta(sum(durations_span))
 
     def get_durations_span(self):
+        if self.begin_date is None:
+            return []
+
         duration = self.duration.get_duration("hour")
         task_date = copy(self.begin_date)
         span = []
@@ -766,10 +772,13 @@ class Task(Component):
         if self.state == "done":
             return 100
 
-        current_date = self.app.manager.get_current_date()
-        return sum(self.get_durations_span()[:max(
-            0, int(ceil((current_date - self.begin_date).get_duration("day")))
-        )]) / self.duration.get_duration() * 100
+        if self.begin_date is None:
+            return 0
+        else:
+            current_date = self.app.manager.get_current_date()
+            return sum(self.get_durations_span()[:max(
+                0, int(ceil((current_date - self.begin_date).get_duration("day")))
+            )]) / self.duration.get_duration() * 100
 
     def get_consumed_resources(self):
         return self.resource
@@ -1128,7 +1137,8 @@ class ScrollablePlanning(FloatLayout):
             self.ids.unit_switch.switch("hour")
             date = datetime.datetime.combine(
                 self.app.manager.get_project_begin_date().date +
-                datetime.timedelta(days=self.cursor.cursor_position),
+                datetime.timedelta(
+                    days=(self.app.manager.get_project_end_date()-self.app.manager.get_project_begin_date()).get_duration("day")),
                 datetime.datetime.min.time())
             self.set_times(
                 date, date +
