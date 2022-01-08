@@ -10,6 +10,7 @@ from math import ceil
 import datetime
 from dateutil import rrule
 from numpy.core.numeric import True_
+from numpy.lib.function_base import gradient
 from sklearn.linear_model import LinearRegression
 
 from kivy.metrics import sp, dp
@@ -489,6 +490,7 @@ class Task(Component):
     state = StringProperty("pending")
     fixed = BooleanProperty(False)
     assignments = ListProperty([])
+    sub_tasks = ListProperty([])
 
     bar_height = NumericProperty()
 
@@ -686,7 +688,7 @@ class Task(Component):
 
     def on_touch_down(self, touch):
         if touch.is_double_tap and self.collide_point(*touch.pos):
-            content = EditTaskDialogContent()
+            content = EditTaskDialogContent(task=self)
             content.ids.description_input.text = self.description
             content.ids.name_input.text = self.name
 
@@ -797,7 +799,7 @@ class Task(Component):
 
 
 class EditTaskDialogContent(BoxLayout):
-    pass
+    task = ObjectProperty()
 
 
 class StartTask(Component):
@@ -859,27 +861,8 @@ class GrabableGrid(ScatterLayout):
         self.add_widget(self.grid)
 
         self.bind(size=self.update_grid)
-        self.content.bind(children=self.update_bounding_box)
         Clock.schedule_once(self.update_grid)
         Clock.schedule_once(self.to_center)
-
-    def update_bounding_box(self, *args):
-        x1, y1 = float("inf"), float("inf")
-        x2, y2 = -float("inf"), -float("inf")
-
-        for child in self.content.children:
-            if child.x < x1:
-                x1 = child.x
-            if child.y < y1:
-                y1 = child.y
-            if child.x + child.width > x2:
-                x2 = child.x + child.width
-            if child.y + child.height > y2:
-                y2 = child.y + child.height
-
-        self.content.size_hint = (None, None)
-        self.content.pos = (x1, y1)
-        self.content.size = (x2 - x1, y2 - y1)
 
     def collide_point(self, x, y):
         x0, y0 = self.parent.to_local(self.parent.x, self.parent.y)
@@ -891,7 +874,6 @@ class GrabableGrid(ScatterLayout):
             return False
 
     def on_touch_up(self, touch):
-
         # Round coordinates to have "aimed positioning"
         if touch.grab_current is self:
             touch.ungrab(self)
@@ -1279,11 +1261,11 @@ class ChipList(BoxLayout):
 
         validate_btn = MDFlatButton(text="Validate", text_color=color)
         discard_btn = MDFlatButton(text="Discard", text_color=color)
-        name_field = AddChipField()
+        chip_field = AddChipField()
 
         dialog = MDDialog(title="Assign a person to the task",
                           type="custom",
-                          content_cls=name_field,
+                          content_cls=chip_field,
                           buttons=[discard_btn, validate_btn])
         dialog.auto_dismiss = False
 
@@ -1314,6 +1296,60 @@ class TaskItem(HorizontalGradientRectangle, TaskTooltiped):
     def setup(self):
         self.gradient_colors = self.task.get_state_gradient_colors()
         self.update_tooltip()
+
+
+class SubTask(HorizontalGradientRectangle):
+    name = StringProperty()
+    duration = NumericProperty()
+    gradient_colors = ListProperty()
+
+
+class EditSubTaskDialogContent(BoxLayout):
+    pass
+
+
+class SubTaskList(BoxLayout):
+    task = ObjectProperty()
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.app = MDApp.get_running_app()
+
+        Clock.schedule_once(lambda x: self.setup())
+
+    def setup(self):
+        for sub_task in self.task.sub_tasks:
+            self.ids.sub_tasks_layout.add_widget(SubTask(**sub_task))
+
+    def open_add_dialog(self):
+        color = self.app.theme_cls.primary_color
+
+        validate_btn = MDFlatButton(text="Validate", text_color=color)
+        discard_btn = MDFlatButton(text="Discard", text_color=color)
+        sub_task_edit_dialog = EditSubTaskDialogContent()
+
+        dialog = MDDialog(title="Edit sub task",
+                          type="custom",
+                          content_cls=sub_task_edit_dialog,
+                          buttons=[discard_btn, validate_btn])
+
+        def validate(*args):
+            sub_task_data = {
+                'name': sub_task_edit_dialog.ids.name_field.text,
+                'duration': int(sub_task_edit_dialog.ids.duration_field.text),
+                'gradient_colors': self.task.gradient_colors
+            }
+            self.task.sub_tasks.append(sub_task_data)
+            self.ids.sub_tasks_layout.add_widget(SubTask(**sub_task_data))
+            dialog.dismiss()
+
+        def discard(*args):
+            dialog.dismiss()
+
+        validate_btn.bind(on_press=validate)
+        discard_btn.bind(on_press=discard)
+
+        dialog.open()
 
 
 class BurndownChart(BoxLayout):

@@ -30,9 +30,9 @@ class ProjectsListScreen(Screen):
                 content.ids.name_field.text,
                 int(content.ids.capacity_field.text),
                 int(content.ids.day_duration_field.text), [
-                    len(content.ids.day_chips_layout.children)-i-1 for i, day_chip in enumerate(
-                        content.ids.day_chips_layout.children)
-                    if day_chip.active
+                    len(content.ids.day_chips_layout.children) - i - 1
+                    for i, day_chip in enumerate(content.ids.day_chips_layout.
+                                                 children) if day_chip.active
                 ])
             self.load_file_list()
 
@@ -86,7 +86,9 @@ class ChooseEditorScreen(Screen):
             TaskDate.from_date(date_range[0], 0))
         self.app.manager.set_project_end_date(
             TaskDate.from_date(date_range[-1], 0))
-        if not (self.app.manager.get_projet_begin_date() <= self.manager.get_current_date() <= self.app.manager.get_project_end_date()):
+        if not (self.app.manager.get_projet_begin_date() <=
+                self.manager.get_current_date() <=
+                self.app.manager.get_project_end_date()):
             self.app.set_current_date(
                 self.app.manager.get_project_begin_date())
         self.app.manager.save()
@@ -164,7 +166,7 @@ class PlanningScreen(Screen):
     def update_icon_state(self, state):
         self.scrollable_planning.ids.state_icon.state = state
 
-    def edge_generator(self, adjacencies,  end_task_index):
+    def edge_generator(self, adjacencies, end_task_index):
         for i1, adj in enumerate(adjacencies):
             if len(adj) == 0:
                 yield i1, end_task_index
@@ -172,7 +174,7 @@ class PlanningScreen(Screen):
                 for i2 in adj:
                     yield i1, i2
 
-    def compute_gantt(self,  force=False):
+    def compute_gantt(self, force=False):
         # Get PERT graph and copy in  case we have to remove unactivated tasks
         pert_graph = self.app.manager.get_pert()
         pert_copy = pert_graph.copy()
@@ -200,16 +202,17 @@ class PlanningScreen(Screen):
                 max_end_times.append(
                     self.app.manager.date_to_index(v.max_end_date))
                 if v.state == "done" or v.fixed:
-                    min_begin_times.append(self.app.manager.date_to_index(
-                        v.min_begin_date))
+                    min_begin_times.append(
+                        self.app.manager.date_to_index(v.min_begin_date))
                     fixed_begin_times.append(
                         max(0, self.app.manager.date_to_index(v.begin_date)))
                 elif v.state == "progress":
-                    min_begin_times.append(self.app.manager.date_to_index(
-                        v.min_begin_date))
+                    min_begin_times.append(
+                        self.app.manager.date_to_index(v.min_begin_date))
                     if not force:
                         fixed_begin_times.append(
-                            max(0, self.app.manager.date_to_index(v.begin_date)))
+                            max(0,
+                                self.app.manager.date_to_index(v.begin_date)))
                     else:
                         fixed_begin_times.append(None)
                 else:
@@ -241,8 +244,8 @@ class PlanningScreen(Screen):
         solver = SchedulerSolver(
             n_tasks=len(tasks) + 1,  # Don't forget the end task
             end_index=end_task_index,
-            anteriority_edges=list(self.edge_generator(
-                pert_copy.A, end_task_index)),
+            anteriority_edges=list(
+                self.edge_generator(pert_copy.A, end_task_index)),
             fixed_begin_times=fixed_begin_times,
             min_begin_times=min_begin_times,
             max_end_times=max_end_times,
@@ -271,15 +274,14 @@ class PlanningScreen(Screen):
                 theme_text_color="Custom",
                 text_color=self.app.theme_cls.primary_color,
             )
-            yes_button.bind(
-                on_press=self.on_yes_force_gantt_dialog)
+            yes_button.bind(on_press=self.on_yes_force_gantt_dialog)
             no_button.bind(
                 on_press=lambda *args: self.force_gantt_dialog.dismiss())
 
             self.force_gantt_dialog = MDDialog(
-                text="It seems that the planning is unsolvable,  do you want to recompute in force mode (ie in progress tasks are authorized to be moved)",
-                buttons=[no_button, yes_button]
-            )
+                text=
+                "It seems that the planning is unsolvable,  do you want to recompute in force mode (ie in progress tasks are authorized to be moved)",
+                buttons=[no_button, yes_button])
 
             self.app.manager.set_planning_state("unsolvable")
             self.force_gantt_dialog.open()
@@ -569,8 +571,8 @@ class GraphEditorScreen(Screen):
         self.hide_action_bar()
 
     def export_pert(self, *args):
-        self.ids.edit_area.content.export_to_png(str(
-            self.app.manager.get_planning_path(extension="_pert.png")))
+        self.ids.edit_area.content.export_to_png(
+            str(self.app.manager.get_planning_path(extension="_pert.png")))
 
     def on_pre_leave(self, *args):
         """Un load edit_area contents"""
@@ -583,9 +585,9 @@ class GraphEditorScreen(Screen):
             lambda x: self.app.manager.quit("choose_editor_screen")
         ]]
         self.app.tool_bar.right_action_items = [
-            ['file-export', lambda x: self.export_pert()], [
-                'image-filter-center-focus', lambda x: self.to_center()
-            ]]
+            #['file-export', lambda x: self.export_pert()]
+            ['image-filter-center-focus', lambda x: self.to_center()]
+        ]
 
     def set_selection_tool_bar(self, callback):
         self.app.tool_bar.left_action_items = [['arrow-left', callback]]
