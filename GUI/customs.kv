@@ -429,7 +429,7 @@
     LabeledTextField:
         id: resource_text_field
         label_text: 'Resource:'
-        input_text: str(root.resource)
+        text: str(root.resource)
         hint_text: 'integer'
         bg_color: app.theme_cls.primary_color
         input_filter: 'int'
@@ -771,7 +771,7 @@
         gradient_colors: root.gradient_colors
 
 <ScrollablePlanning>:
-    chunk_size: 52
+    chunk_size: 64
     margin: 6
     tasks_width: entries.width
     
@@ -953,6 +953,7 @@
 
 <TaskLabel>:
     size_hint: (None, None)
+    height: self.minimum_height
     orientation: 'horizontal'
     spacing: sp(6)
 

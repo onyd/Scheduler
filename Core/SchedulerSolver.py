@@ -1,4 +1,5 @@
 from math import exp
+from sys import executable
 from pyomo.core.base.constraint import Constraint
 import pyomo.environ as pyo
 import numpy as np
@@ -27,7 +28,7 @@ class SchedulerSolver:
             i * (self.horizon + 1) + t for t in range(self.horizon + 1)
             for i in range(self.n_tasks)
         ],
-                          domain=pyo.Binary)
+            domain=pyo.Binary)
 
         # Fix varaible to ensure it begins at the eventually asked time
         for i, fixed_time in enumerate(self.fixed_begin_times):
@@ -64,7 +65,7 @@ class SchedulerSolver:
             for t in range(self.horizon + 1)
         ]))
 
-        opt = pyo.SolverFactory('gurobi')
+        opt = pyo.SolverFactory('cbc')
         results = opt.solve(model)
 
         if not results.solver.termination_condition == TerminationCondition.optimal:

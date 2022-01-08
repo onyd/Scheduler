@@ -86,6 +86,9 @@ class ChooseEditorScreen(Screen):
             TaskDate.from_date(date_range[0], 0))
         self.app.manager.set_project_end_date(
             TaskDate.from_date(date_range[-1], 0))
+        if not (self.app.manager.get_projet_begin_date() <= self.manager.get_current_date() <= self.app.manager.get_project_end_date()):
+            self.app.set_current_date(
+                self.app.manager.get_project_begin_date())
         self.app.manager.save()
 
     def open_date_picker(self, *args):
@@ -109,6 +112,8 @@ class BacklogScreen(Screen):
         super().__init__(**kw)
 
         self.app = MDApp.get_running_app()
+        self.backlog = Backlog()
+        self.add_widget(self.backlog)
 
     def on_pre_enter(self):
         self.app.tool_bar.left_action_items = [[
@@ -120,12 +125,10 @@ class BacklogScreen(Screen):
             'content-save', lambda x: self.app.manager.save()
         ]]
 
-        backlog = Backlog()
-        backlog.setup()
-        self.add_widget(backlog)
+        self.backlog.load()
 
     def on_leave(self, *args):
-        self.clear_widgets()
+        self.backlog.unload()
 
 
 class BurndownScreen(Screen):
@@ -161,10 +164,13 @@ class PlanningScreen(Screen):
     def update_icon_state(self, state):
         self.scrollable_planning.ids.state_icon.state = state
 
-    def edge_generator(self, adjacencies):
+    def edge_generator(self, adjacencies,  end_task_index):
         for i1, adj in enumerate(adjacencies):
-            for i2 in adj:
-                yield i1, i2
+            if len(adj) == 0:
+                yield i1, end_task_index
+            else:
+                for i2 in adj:
+                    yield i1, i2
 
     def compute_gantt(self,  force=False):
         # Get PERT graph and copy in  case we have to remove unactivated tasks
@@ -229,12 +235,14 @@ class PlanningScreen(Screen):
              self.app.manager.get_project_begin_date()).get_duration("hour")
         ) - sum(
             self.app.manager.time_cuts) * self.app.manager.get_day_duration()
+        end_task_index = pert_copy.V.index(end_task)
 
         # Solve the linear problem
         solver = SchedulerSolver(
             n_tasks=len(tasks) + 1,  # Don't forget the end task
-            end_index=pert_copy.V.index(end_task),
-            anteriority_edges=list(self.edge_generator(pert_copy.A)),
+            end_index=end_task_index,
+            anteriority_edges=list(self.edge_generator(
+                pert_copy.A, end_task_index)),
             fixed_begin_times=fixed_begin_times,
             min_begin_times=min_begin_times,
             max_end_times=max_end_times,
@@ -339,7 +347,8 @@ class PlanningScreen(Screen):
         FileManager.delete_file(right_path)
 
     def change_cursor_visibility(self, *args):
-        self.scrollable_planning.show_time_cursor = not self.scrollable_planning.show_time_cursor
+        if self.scrollable_planning.planning_unit == "day":
+            self.scrollable_planning.show_time_cursor = not self.scrollable_planning.show_time_cursor
 
     def on_pre_enter(self):
 
@@ -560,8 +569,8 @@ class GraphEditorScreen(Screen):
         self.hide_action_bar()
 
     def export_pert(self, *args):
-        self.ids.edit_area.export_to_png(
-            self.app.manager.get_planning_path(extension="_pert.png"))
+        self.ids.edit_area.content.export_to_png(str(
+            self.app.manager.get_planning_path(extension="_pert.png")))
 
     def on_pre_leave(self, *args):
         """Un load edit_area contents"""

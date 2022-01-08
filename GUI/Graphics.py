@@ -10,7 +10,7 @@ class Gradient:
     @staticmethod
     def horizontal(*args):
         texture = Texture.create(size=(len(args), 1), colorfmt='rgba')
-        buf = bytes([max(0, min(int(v * 255), 255))
+        buf = bytes([int(v)
                      for v in chain(*args)])  # flattens
 
         texture.blit_buffer(buf, colorfmt='rgba', bufferfmt='ubyte')
@@ -19,7 +19,7 @@ class Gradient:
     @staticmethod
     def vertical(*args):
         texture = Texture.create(size=(1, len(args)), colorfmt='rgba')
-        buf = bytes([max(0, min(int(v * 255), 255))
+        buf = bytes([int(v)
                      for v in chain(*args)])  # flattens
         texture.blit_buffer(buf, colorfmt='rgba', bufferfmt='ubyte')
         return texture

@@ -173,6 +173,8 @@ class DiscreteMovableBehavior(object):
     x_step = NumericProperty(10)
     x_offset = NumericProperty(0)
 
+    cursor_step = NumericProperty(1)
+
     selected = BooleanProperty(False)
 
     def __init__(self, **kwargs):
@@ -183,10 +185,10 @@ class DiscreteMovableBehavior(object):
         self.show_y = None
         self.bind(selected=self.update_buttons, do_move_x=self.update_buttons)
 
-    def on_move_left(self, *args):
+    def on_move_left(self, step):
         pass
 
-    def on_move_right(self, *args):
+    def on_move_right(self, step):
         pass
 
     def set_cursor(self, cursor_position):
@@ -288,17 +290,17 @@ class DiscreteMovableBehavior(object):
             if self.collide_button(
                     x, y, right=True
             ) and self.cursor_position < self.max_cursor_position:
-                self.dispatch("on_move_right")
+                self.dispatch("on_move_right", self.cursor_step)
                 self.x += self.x_step
-                self.cursor_position += 1
+                self.cursor_position += self.cursor_step
                 self.update_buttons()
                 return True
             elif self.collide_button(
                     x, y, right=False
             ) and self.cursor_position > self.min_cursor_position:
-                self.dispatch("on_move_left")
+                self.dispatch("on_move_left", self.cursor_step)
                 self.x -= self.x_step
-                self.cursor_position -= 1
+                self.cursor_position -= self.cursor_step
                 self.update_buttons()
                 return True
 
@@ -325,6 +327,8 @@ class SelectDragBehavior(object):
         self.sdb_enabled = True
 
         super(SelectDragBehavior, self).__init__(**kwargs)
+
+        self.bind(size=lambda *args: self.draw_selection_box())
 
     def _get_uid(self, prefix='sv'):
         return '{0}.{1}'.format(prefix, self.uid)

@@ -9,6 +9,7 @@ import numpy as np
 from math import ceil
 import datetime
 from dateutil import rrule
+from numpy.core.numeric import True_
 from sklearn.linear_model import LinearRegression
 
 from kivy.metrics import sp, dp
@@ -17,6 +18,7 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.relativelayout import RelativeLayout
 from kivy.uix.scatterlayout import ScatterLayout
+from kivy.uix.stencilview import StencilView
 
 from kivy.core.window import Window
 from kivy.uix.behaviors.button import ButtonBehavior
@@ -288,14 +290,12 @@ class Tooltip(Label):
 class Tooltipped(Widget):
     tooltip_txt = StringProperty('Tooltip')
     tooltip_cls = ObjectProperty(Tooltip)
-    close_distance = NumericProperty(5)
 
     def __init__(self, **kwargs):
         self._tooltip = None
         super().__init__(**kwargs)
-        fbind = self.fbind
-        fbind('tooltip_cls', self._build_tooltip)
-        fbind('tooltip_txt', self._update_tooltip)
+        self.fbind('tooltip_cls', self._build_tooltip)
+        self.fbind('tooltip_txt', self._update_tooltip)
         Window.bind(mouse_pos=self.on_mouse_pos)
         self._build_tooltip()
 
@@ -517,13 +517,16 @@ class Task(Component):
         self.prev_state = self.state
         self.fixed = fixed
 
-        Clock.schedule_once(lambda *args: self.setup(name, duration))
+        Clock.schedule_once(
+            lambda *args: self.setup(name, duration, begin_date))
 
-    def setup(self, name, duration):
+    def setup(self, name, duration, begin_date):
+        self.begin_date = begin_date if begin_date is not None else self.app.manager.get_project_begin_date()
         self.bind(activated=self.set_gradient_colors,
                   state=self.update_treatment,
                   fixed=self.draw_fixed_frame,
-                  pos=self.draw_fixed_frame,)
+                  pos=self.draw_fixed_frame,
+                  size=self.draw_fixed_frame)
         self.bind(pos=lambda *args: self.app.manager.set_saved(False),
                   name=lambda *args: self.app.manager.set_saved(False),
                   resource=lambda *args: self.app.manager.set_saved(False),
@@ -637,9 +640,9 @@ class Task(Component):
         self.canvas.after.remove_group("fixed_frame")
         if self.fixed:
             with self.canvas.after:
-                Color(0.5, 0.1, 0.3)
+                Color(0.6, 0.1, 0.3)
                 Line(rectangle=[*self.pos, *self.size],
-                     width=2,
+                     width=3,
                      group="fixed_frame")
 
     def set_done(self):
@@ -743,18 +746,12 @@ class Task(Component):
         self.duration += duration
 
     def get_end_date(self):
-        if self.begin_date is None:
-            return None
-
         durations_span = [
             e if e != 0 else 7 for e in self.get_durations_span()
         ]
         return self.begin_date + TaskDelta(sum(durations_span))
 
     def get_durations_span(self):
-        if self.begin_date is None:
-            return []
-
         duration = self.duration.get_duration("hour")
         task_date = copy(self.begin_date)
         span = []
@@ -771,9 +768,6 @@ class Task(Component):
     def get_progression(self):
         if self.state == "done":
             return 100
-
-        if self.begin_date is None:
-            return 0
         else:
             current_date = self.app.manager.get_current_date()
             return sum(self.get_durations_span()[:max(
@@ -864,8 +858,27 @@ class GrabableGrid(ScatterLayout):
         self.add_widget(self.grid)
 
         self.bind(size=self.update_grid)
+        self.content.bind(children=self.update_bounding_box)
         Clock.schedule_once(self.update_grid)
         Clock.schedule_once(self.to_center)
+
+    def update_bounding_box(self, *args):
+        x1, y1 = float("inf"), float("inf")
+        x2, y2 = -float("inf"), -float("inf")
+
+        for child in self.content.children:
+            if child.x < x1:
+                x1 = child.x
+            if child.y < y1:
+                y1 = child.y
+            if child.x + child.width > x2:
+                x2 = child.x + child.width
+            if child.y + child.height > y2:
+                y2 = child.y + child.height
+
+        self.content.size_hint = (None, None)
+        self.content.pos = (x1, y1)
+        self.content.size = (x2-x1, y2-y1)
 
     def collide_point(self, x, y):
         x0, y0 = self.parent.to_local(self.parent.x, self.parent.y)
@@ -1024,7 +1037,7 @@ class ScrollablePlanning(FloatLayout):
             self.app.manager.set_planning_state("waiting_for_treatment")
 
     def setup_cursor(self, date):
-        if self.planning_unit == "day" and self.show_time_cursor and not self.cursor:
+        if self.show_time_cursor and not self.cursor:
             self.cursor = TimeCursor(size_hint=(None, None),
                                      gradient_colors=[(0.8, 0.2, 0.1, 0.6),
                                                       (0.2, 0.2, 0.4, 0.6)],
@@ -1105,13 +1118,24 @@ class ScrollablePlanning(FloatLayout):
         self.bind(tasks_height=task_span.setter('square_height'))
         self.ids.planning_grid.add_widget(task_span)
 
+    def reload(self):
+        self.unload()
+        self.setup()
+        self.load()
+
     def unload(self):
+        for task_span in self.ids.planning_grid.children:
+            if isinstance(task_span, TaskSpan):
+                task_span.close_tooltip()
+
         self.ids.tasks_layout.clear_widgets()
         self.ids.time_layout.clear_widgets()
         self.ids.planning_grid.clear_widgets()
         if self.cursor:
             self.ids.planning_layout.remove_widget(self.cursor)
             self.cursor = None
+        else:
+            self.show_time_cursor = True
 
     def load(self, unit='day'):
         self.ids.time_layout.clear_widgets()
@@ -1168,7 +1192,7 @@ class Backlog(BoxLayout):
 
         self.app = MDApp.get_running_app()
 
-    def setup(self):
+    def load(self):
         self.ids.to_do_layout.clear_widgets()
         self.ids.pending_layout.clear_widgets()
         self.ids.done_layout.clear_widgets()
@@ -1180,6 +1204,20 @@ class Backlog(BoxLayout):
                 self.ids.pending_layout.add_widget(TaskItem(task=task))
             else:
                 self.ids.to_do_layout.add_widget(TaskItem(task=task))
+
+    def unload(self):
+        for task_span in self.ids.done_layout.children:
+            task_span.close_tooltip()
+
+        for task_span in self.ids.to_do_layout.children:
+            task_span.close_tooltip()
+
+        for task_span in self.ids.pending_layout.children:
+            task_span.close_tooltip()
+
+        self.ids.done_layout.clear_widgets()
+        self.ids.to_do_layout.clear_widgets()
+        self.ids.pending_layout.clear_widgets()
 
 
 class AddChipField(BoxLayout):
@@ -1460,6 +1498,8 @@ class TaskSpan(DiscreteMovableBehavior, RelativeLayout, TaskTooltiped):
 
         Clock.schedule_once(self.setup)
 
+        self.bind(selected=self.request_keyboard)
+
     def setup(self, *args):
         self.task.bind(state=self.set_gradient_colors,
                        description=self.setter('tooltip_txt'),
@@ -1468,6 +1508,7 @@ class TaskSpan(DiscreteMovableBehavior, RelativeLayout, TaskTooltiped):
         self.task.bind(fixed=self.draw_fixed_frame,
                        duration=self.update_tooltip,
                        begin_date=self.update_tooltip)
+        self.task.bind(duration=self.draw_fixed_frame)
         self.bind(cursor_position=self.task.update_state)
 
         if self.planning_unit == "day":
@@ -1483,22 +1524,44 @@ class TaskSpan(DiscreteMovableBehavior, RelativeLayout, TaskTooltiped):
         self.draw_continue_arrow()
         Clock.schedule_once(self.draw_fixed_frame)
 
+    def request_keyboard(self, *args):
+        if self.selected:
+            self._keyboard = Window.request_keyboard(
+                self._keyboard_closed, self)
+            self._keyboard.bind(on_key_down=self._on_keyboard_down)
+
+    def _keyboard_closed(self):
+        self._keyboard.unbind(on_key_down=self._on_keyboard_down)
+        self._keyboard = None
+        self.cursor_step = 1
+
+    def _on_keyboard_down(self, keyboard, keycode, text, modifiers):
+        print(self)
+        if self.selected and len(modifiers) > 0 and modifiers[0] == 'ctrl' and text == 'b':
+            if self.cursor_step == 1:
+                self.cursor_step = self.app.manager.get_day_duration()
+                toast("Passed in day step mode")
+            else:
+                self.cursor_step = 1
+                toast("Passed in hour step mode")
+        return False
+
     def update_do_move_x(self, *args):
         self.do_move_x = not (self.task.state == "done" or self.task.fixed)
 
-    def on_move_left(self, *args):
-        self.task.set_begin_date(self.task.begin_date - TaskDelta(1))
+    def on_move_left(self, step):
+        self.task.set_begin_date(self.task.begin_date - TaskDelta(step))
         if self.task.begin_date.date.weekday(
         ) not in self.app.manager.get_week_days():
             self.cursor_position -= 1
-            self.dispatch("on_move_left")
+            self.dispatch("on_move_left", 1)
 
-    def on_move_right(self, *args):
-        self.task.set_begin_date(self.task.begin_date + TaskDelta(1))
+    def on_move_right(self, step):
+        self.task.set_begin_date(self.task.begin_date + TaskDelta(step))
         if self.task.begin_date.date.weekday(
         ) not in self.app.manager.get_week_days():
             self.cursor_position += 1
-            self.dispatch("on_move_right")
+            self.dispatch("on_move_right", 1)
 
     def get_current_span(self, unit="hour"):
         if unit == "hour":
@@ -1517,45 +1580,47 @@ class TaskSpan(DiscreteMovableBehavior, RelativeLayout, TaskTooltiped):
         self.gradient_colors = self.task.get_state_gradient_colors()
         self.durations_span = self.task.get_durations_span()
         self.ids.layout.clear_widgets()
-
-        if self.planning_unit == "day":
-            elements = []
-            begin_gradient_color = self.gradient_colors[0]
-            durations_acc = 0
-            for i, hours in enumerate(self.durations_span):
-                if hours > 0:
-                    durations_acc += self.durations_span[i]
-                    t = durations_acc / self.task.duration.get_duration()
-                    end_gradient_color = list(
-                        (1 - t) * np.array(self.gradient_colors[0]) +
-                        t * np.array(self.gradient_colors[1]))
-                    element = TaskSpanElement(square_width=self.square_width,
-                                              square_height=self.square_height,
-                                              gradient_colors=[
-                                                  begin_gradient_color,
-                                                  end_gradient_color
-                                              ],
-                                              hour_span=hours)
-                    elements.append(element)
-                    self.ids.layout.add_widget(element)
-                    begin_gradient_color = end_gradient_color
-                else:
-                    self.ids.layout.add_widget(
-                        TaskSpanSpacer(square_width=self.square_width,
-                                       square_height=self.square_height))
-            indexed = elements[len(elements)//2]
-            indexed.index = str(self.task.get_consumed_resources())
-            indexed.do_have_index = True
-        else:
-            element = TaskSpanElement(square_width=self.square_width,
-                                      square_height=self.square_height,
-                                      gradient_colors=self.gradient_colors,
-                                      hour_span=self.get_current_span(
-                                          "hour"),
-                                      index=str(
-                                          self.task.get_consumed_resources()),
-                                      do_have_index=True)
-            self.ids.layout.add_widget(element)
+        try:
+            if self.planning_unit == "day":
+                elements = []
+                begin_gradient_color = self.gradient_colors[0]
+                durations_acc = 0
+                for i, hours in enumerate(self.durations_span):
+                    if hours > 0:
+                        durations_acc += self.durations_span[i]
+                        t = durations_acc / self.task.duration.get_duration()
+                        end_gradient_color = list(
+                            (1 - t) * np.array(self.gradient_colors[0]) +
+                            t * np.array(self.gradient_colors[1]))
+                        element = TaskSpanElement(square_width=self.square_width,
+                                                  square_height=self.square_height,
+                                                  gradient_colors=[
+                                                      begin_gradient_color,
+                                                      end_gradient_color
+                                                  ],
+                                                  hour_span=hours)
+                        elements.append(element)
+                        self.ids.layout.add_widget(element)
+                        begin_gradient_color = end_gradient_color
+                    else:
+                        self.ids.layout.add_widget(
+                            TaskSpanSpacer(square_width=self.square_width,
+                                           square_height=self.square_height))
+                indexed = elements[len(elements)//2]
+                indexed.index = str(self.task.get_consumed_resources())
+                indexed.do_have_index = True
+            else:
+                element = TaskSpanElement(square_width=self.square_width,
+                                          square_height=self.square_height,
+                                          gradient_colors=self.gradient_colors,
+                                          hour_span=self.get_current_span(
+                                              "hour"),
+                                          index=str(
+                                              self.task.get_consumed_resources()),
+                                          do_have_index=True)
+                self.ids.layout.add_widget(element)
+        except:
+            print("Error: in build of TaskSpan:", self)
 
     def draw_continue_arrow(self, *args):
         self.canvas.after.remove_group("continue_arrow")
@@ -1577,7 +1642,7 @@ class TaskSpan(DiscreteMovableBehavior, RelativeLayout, TaskTooltiped):
         self.canvas.after.remove_group("fixed_frame")
         if self.task.fixed:
             with self.canvas.after:
-                Color(0.5, 0.1, 0.3)
+                Color(0.6, 0.1, 0.3)
                 Line(rectangle=[*self.pos, *self.size],
                      width=2,
                      group="fixed_frame")

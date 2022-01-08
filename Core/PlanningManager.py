@@ -163,7 +163,7 @@ class PlanningManager:
     def sort_tasks_by_begin_time(self):
         self.get_pert().sort_verticies(
             key=lambda x: (x.get_begin_date(), x.get_duration()))
-        self.get_planning_screen().scrollable_planning.load()
+        self.get_planning_screen().scrollable_planning.reload()
         self.set_saved(False)
 
     def add_editor_link(self, begin, end):
