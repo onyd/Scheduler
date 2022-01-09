@@ -59,6 +59,7 @@
         hint_text: 'Name'
 
 <ChipList>:
+    addable: True
     StackLayout:
         id: content
         size_hint_y: None
@@ -67,37 +68,79 @@
         spacing: sp(6)
     MDIconButton:
         icon: 'plus'
-        on_release: root.open_add_dialog()
+        on_release: root.open_add_dialog() 
+        disabled: not root.addable
+
 <SubTaskList>:
     ScrollView:
         BoxLayout:
-            id: sub_tasks_layout
             orientation: 'vertical'
             size_hint_y: None
             height: self.minimum_height
-            padding: sp(12)
-            spacing: sp(4)
+            
+            BoxLayout:
+                id: sub_tasks_layout
+                orientation: 'vertical'
+                size_hint_y: None
+                height: self.minimum_height
+                padding: sp(12)
+                spacing: sp(4)
 
-    MDIconButton:
-        icon: 'plus'
-        on_release: root.open_add_dialog()
+            BoxLayout:
+                size_hint_y: None
+                height: plus_button.height
+
+                MDIconButton:
+                    id: plus_button
+                    icon: 'plus'
+                    on_release: root.open_add_dialog()
+                MDIconButton:
+                    icon: 'minus'
+                    on_release: root.remove_sub_task() 
+                MDIconButton:
+                    icon: 'check'
+                    on_release: root.set_state() 
+
 <SubTask>:
     size_hint: 1, None
     height: content_layout.height
+    gradient_colors: self.sub_task_list.task.gradient_colors if self.sub_task_list.task and not self.done else [(0.0, 0.7, 0.4, 0.6), (0.0, 0.2, 0.7, 0.6)]
 
     BoxLayout:
         id: content_layout
         orientation: 'vertical'
         spacing: sp(6)
-        size_hint: 1, None
+        size_hint_y: None
         height: self.minimum_height
 
-        ComponentBar:
-            bar_margin: 0
-            icon: res+'task.png'
-            font_size: 20
-            icon_size: 24, 24
-            text: root.name
+        FloatLayout:
+            id: bar_layout
+            size_hint_y: None
+            height: bar.height
+
+            ComponentBar:
+                id: bar
+                bar_margin: 0
+                icon: res+'task.png'
+                font_size: 24
+                icon_size: 32, 32
+                text: root.name
+
+                pos_hint: {'center_y': 0.5}
+            
+            CircleIndex:
+                id: index
+                index: str(root.duration) + "h"
+                size: 24, 24
+                right: bar_layout.x+bar_layout.width-sp(12)
+                pos_hint: {"center_y": 0.5}
+
+        ChipList:
+            id: assignments_list
+            size_hint: 1, None
+            height: self.minimum_height
+            chip_texts: root.assignments
+            callback: lambda text: root.assignments.append(text)
 
 <EditSubTaskDialogContent>:
     orientation: 'vertical'
@@ -123,6 +166,49 @@
 
         size_hint: None, None
         size: 400, 32
+<TaskItemDialogContent>:
+    size_hint_x: 0.9
+    pos_hint: {'center_x': 0.5}
+
+    BoxLayout:
+        id: description_layout
+        orientation: 'vertical'
+        size_hint: 0.5, 1
+
+        MDLabel: 
+            id: description_label
+            text: 'Description'
+            size_hint: (1, None)
+            height: 32
+            font_style: 'H6'
+            pos_hint: {'top': 1, 'left': 0}
+
+        TextInput:
+            id: description_input
+            text: root.task.description
+            multiline: True
+            size_hint: 1, None
+            height: description_layout.height-description_label.height
+    
+    BoxLayout:
+        id: sub_tasks_layout
+        orientation: 'vertical'
+        size_hint: 0.5, 1
+
+        MDLabel: 
+            id: sub_task_label
+            text: 'Sub tasks'
+            size_hint: (1, None)
+            height: 32
+            font_style: 'H6'
+            pos_hint: {'top': 1, 'left': 0}
+
+        SubTaskList:
+            id: sub_task_list
+            size_hint: 1, None
+            height: sub_tasks_layout.height-sub_task_label.height
+            task: root.task
+
 
 <TaskItem>:
     gradient_colors: [(0.4, 1., 0., 1), (1., 0.4, 0., 1)]
@@ -147,7 +233,9 @@
             id: assignments_list
             size_hint: 1, None
             height: self.minimum_height
-            task: root.task
+            chip_texts: root.task.assignments
+            callback: lambda text: root.task.assignments.append(text)
+            addable: len(root.task.sub_tasks) == 0
 
         BoxLayout:
             size_hint: None, None
@@ -664,7 +752,7 @@
             id: description_input
             multiline: True
             size_hint: 1, None
-            height: (root.height-name_layout.height-description_label.height) / 2
+            height: (root.height-name_layout.height-description_label.height-sub_task_label.height) / 2
 
         MDLabel: 
             id: sub_task_label
@@ -677,7 +765,7 @@
         SubTaskList:
             id: sub_task_list
             size_hint: 1, None
-            height: (root.height-name_layout.height-sub_task_label.height) / 2
+            height: (root.height-name_layout.height-description_label.height-sub_task_label.height) / 2
             task: root.task
 
 
@@ -705,21 +793,12 @@
             height: sheet_layout.height-buttons_layout.height-title.height
             y: buttons_layout.y+buttons_layout.height
 
-        FloatLayout: 
+        StackLayout: 
             id: buttons_layout
             size_hint: (1, None)
-            height: validate_btn.height
+            height: self.minimum_height
+            orientation: 'rl-tb'
 
-            MDFlatButton:
-                id: validate_btn 
-                text: "OK"
-                text_color: app.theme_cls.primary_color
-                pos_hint: {'right': 1}
-            MDFlatButton:
-                id: cancel_btn
-                text: "CANCEL"
-                text_color: app.theme_cls.primary_color
-                pos: (validate_btn.x-validate_btn.width, validate_btn.y)
 <TaskTreatmentDialog>:
     orientation: "vertical"
     padding: sp(6)

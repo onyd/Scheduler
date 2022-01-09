@@ -1,6 +1,5 @@
 from copy import copy
-import enum
-from kivy.uix.textinput import TextInput
+from re import sub
 from kivy.uix.widget import Widget
 from kivymd.toast.kivytoast.kivytoast import toast
 from kivymd.uix.dialog import MDDialog
@@ -9,8 +8,6 @@ import numpy as np
 from math import ceil
 import datetime
 from dateutil import rrule
-from numpy.core.numeric import True_
-from numpy.lib.function_base import gradient
 from sklearn.linear_model import LinearRegression
 
 from kivy.metrics import sp, dp
@@ -29,7 +26,7 @@ from kivy.uix.modalview import ModalView
 
 from kivy.properties import (StringProperty, ColorProperty, NumericProperty,
                              ListProperty, ObjectProperty, BooleanProperty,
-                             ReferenceListProperty)
+                             ReferenceListProperty, DictProperty)
 
 from kivy.clock import Clock
 from kivy.animation import Animation
@@ -55,7 +52,8 @@ from Utils.TaskTime import TaskDate, TaskDelta
 from kivy.garden.matplotlib.backend_kivyagg import FigureCanvasKivyAgg
 import matplotlib.pyplot as plt
 
-from GUI.Behavior import (SelectDragBehavior, AntiCollisionObject)
+from GUI.Behavior import (
+    SelectDragBehavior, AntiCollisionObject, SelectionBehavior)
 from GUI.Behavior import DiscreteMovableBehavior
 
 from Utils.XAbleObject import SerializableObject
@@ -407,7 +405,7 @@ class Component(SelectDragBehavior, BoxLayout, SerializableObject,
     def edit_mode(self, igniter, mode):
         self.mode = mode
         self.sdb_enabled = True
-        self.unselect()
+        self.selected = False
         self.selection_frame_color = (0., 0., 0., 1.)
 
     # Event
@@ -447,25 +445,26 @@ class SheetView(ModalView, RectangularElevationBehavior,
 class DialogSheetView(SheetView):
     title = StringProperty("")
     content = ObjectProperty()
-    on_validate = ObjectProperty(lambda x: x)
-    on_cancel = ObjectProperty(lambda x: x)
+    buttons = ListProperty()
 
     def __init__(self,
-                 title="",
-                 content=None,
-                 on_validate=lambda x: x,
-                 on_cancel=lambda x: x,
                  **kwargs):
         super().__init__(**kwargs)
+        self.bind(buttons=self.update_buttons,
+                  content=self.update_content)
 
-        self.title = title
-        self.content = content
-        self.on_validate = on_validate
-        self.on_cancel = on_cancel
+        self.update_content()
+        self.update_buttons()
 
-        self.ids.validate_btn.bind(on_press=self.on_validate)
-        self.ids.cancel_btn.bind(on_press=self.on_cancel)
+    def update_buttons(self, *args):
+        self.ids.buttons_layout.clear_widgets()
+        for button_data in self.buttons:
+            button = MDFlatButton(**button_data[0])
+            self.ids.buttons_layout.add_widget(button)
+            button.bind(on_press=button_data[1])
 
+    def update_content(self, *args):
+        self.ids.content_layout.clear_widgets()
         self.ids.content_layout.add_widget(self.content)
 
 
@@ -490,7 +489,7 @@ class Task(Component):
     state = StringProperty("pending")
     fixed = BooleanProperty(False)
     assignments = ListProperty([])
-    sub_tasks = ListProperty([])
+    sub_tasks = DictProperty({})
 
     bar_height = NumericProperty()
 
@@ -524,6 +523,8 @@ class Task(Component):
     def setup(self, name, duration, begin_date):
         self.begin_date = begin_date if begin_date is not None else self.app.manager.get_project_begin_date(
         )
+        self.name = name
+
         self.bind(activated=self.set_gradient_colors,
                   state=self.update_treatment,
                   fixed=self.draw_fixed_frame,
@@ -540,7 +541,8 @@ class Task(Component):
             fixed=lambda *args: self.app.manager.set_saved(False),
             min_begin_date=lambda *args: self.app.manager.set_saved(False),
             max_end_date=lambda *args: self.app.manager.set_saved(False),
-            assignments=lambda *args: self.app.manager.set_saved(False))
+            assignments=lambda *args: self.app.manager.set_saved(False),
+            sub_tasks=lambda *args: self.app.manager.set_saved(False))
         self.bind(resource=self.update_planning_state,
                   begin_date=self.update_planning_state,
                   duration=self.update_planning_state,
@@ -567,7 +569,15 @@ class Task(Component):
 
         self.set_gradient_colors()
         self.draw_fixed_frame()
-        self.name = name
+        if len(self.sub_tasks) > 0:
+            self.update_assignments()
+
+    def update_assignments(self, *args):
+        assignments = set()  # Use of a set keep assignments only once
+        for sub_task in self.sub_tasks.values():
+            assignments.update(set(sub_task['assignments']))
+        # Convert to list (for json serializability)
+        self.assignments = list(assignments)
 
     def update_duration(self, *args):
         day = self.ids.day_text_field.text
@@ -700,8 +710,8 @@ class Task(Component):
             sheetview = DialogSheetView(
                 title='Edit task',
                 content=content,
-                on_validate=on_validate,
-                on_cancel=lambda x: sheetview.dismiss(),
+                buttons=[({'text': "OK"}, on_validate),
+                         ({'text': "CANCEL"}, lambda x: sheetview.dismiss())],
                 size_hint=(0.8, 0.8))
 
             sheetview.open()
@@ -768,14 +778,25 @@ class Task(Component):
         return span
 
     def get_progression(self):
-        if self.state == "done":
-            return 100
+        # Compute progression from sub tasks
+        if len(self.sub_tasks) > 0:
+            total_duration = 0
+            done_duration = 0
+            for sub_task in self.sub_tasks.values():
+                total_duration += sub_task['duration']
+                if sub_task['done']:
+                    done_duration += sub_task['duration']
+            return int(done_duration/total_duration*100)
         else:
-            current_date = self.app.manager.get_current_date()
-            return sum(self.get_durations_span()[:max(
-                0,
-                int(ceil((current_date - self.begin_date).get_duration("day")))
-            )]) / self.duration.get_duration() * 100
+            # Compute progression from current date
+            if self.state == "done":
+                return 100
+            else:
+                current_date = self.app.manager.get_current_date()
+                return sum(self.get_durations_span()[:max(
+                    0,
+                    int(ceil((current_date - self.begin_date).get_duration("day")))
+                )]) / self.duration.get_duration() * 100
 
     def get_consumed_resources(self):
         return self.resource
@@ -795,6 +816,7 @@ class Task(Component):
                                state=self.state,
                                fixed=self.fixed,
                                assignments=self.assignments,
+                               sub_tasks=self.sub_tasks,
                                **kwargs)
 
 
@@ -854,10 +876,10 @@ class GrabableGrid(ScatterLayout):
         self.grid = Grid(size_hint=(None, None))
         self.grid.bind(height=lambda instance, value: self.grid.setter(
             'bold_step_horizontal')
-                       (instance, value / self.grid.square_height / 3),
-                       width=lambda instance, value: self.grid.setter(
-                           'bold_step_vertical')
-                       (instance, value / self.grid.square_width / 3))
+            (instance, value / self.grid.square_height / 3),
+            width=lambda instance, value: self.grid.setter(
+            'bold_step_vertical')
+            (instance, value / self.grid.square_width / 3))
         self.add_widget(self.grid)
 
         self.bind(size=self.update_grid)
@@ -1188,15 +1210,6 @@ class Backlog(BoxLayout):
                 self.ids.to_do_layout.add_widget(TaskItem(task=task))
 
     def unload(self):
-        for task_span in self.ids.done_layout.children:
-            task_span.close_tooltip()
-
-        for task_span in self.ids.to_do_layout.children:
-            task_span.close_tooltip()
-
-        for task_span in self.ids.pending_layout.children:
-            task_span.close_tooltip()
-
         self.ids.done_layout.clear_widgets()
         self.ids.to_do_layout.clear_widgets()
         self.ids.pending_layout.clear_widgets()
@@ -1216,8 +1229,7 @@ class AssignmentChip(MDChip):
             validate_btn = MDFlatButton(text="Validate", text_color=color)
             discard_btn = MDFlatButton(text="Discard", text_color=color)
             name_field = MDLabel(
-                text=
-                f"Do you want to remove the assignement {self.text} from task {self.assignement_list.task.get_name()} ?"
+                text=f"Do you want to remove the assignement {self.text} from task {self.assignement_list.task.get_name()} ?"
             )
 
             dialog = MDDialog(title="Remove assignment",
@@ -1243,18 +1255,21 @@ class AssignmentChip(MDChip):
 
 
 class ChipList(BoxLayout):
-    task = ObjectProperty()
+    chip_texts = ListProperty()
+    callback = ObjectProperty()
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.app = MDApp.get_running_app()
 
+        self.bind(chip_texts=self.setup)
         Clock.schedule_once(lambda x: self.setup())
 
-    def setup(self):
-        for assignment in self.task.assignments:
+    def setup(self, *args):
+        self.ids.content.clear_widgets()
+        for text in self.chip_texts:
             self.ids.content.add_widget(
-                AssignmentChip(text=assignment, assignement_list=self))
+                AssignmentChip(text=text, assignement_list=self))
 
     def open_add_dialog(self):
         color = self.app.theme_cls.primary_color
@@ -1270,9 +1285,10 @@ class ChipList(BoxLayout):
         dialog.auto_dismiss = False
 
         def validate(*args):
-            self.task.assignments.append(name_field.ids.field.text)
+            if self.callback:
+                self.callback(chip_field.ids.field.text)
             self.ids.content.add_widget(
-                AssignmentChip(text=name_field.ids.field.text,
+                AssignmentChip(text=chip_field.ids.field.text,
                                assignement_list=self))
             dialog.dismiss()
 
@@ -1285,31 +1301,9 @@ class ChipList(BoxLayout):
         dialog.open()
 
 
-class TaskItem(HorizontalGradientRectangle, TaskTooltiped):
-    task = ObjectProperty()
-
-    def __init__(self, **kw):
-        super().__init__(**kw)
-
-        Clock.schedule_once(lambda x: self.setup())
-
-    def setup(self):
-        self.gradient_colors = self.task.get_state_gradient_colors()
-        self.update_tooltip()
-
-
-class SubTask(HorizontalGradientRectangle):
-    name = StringProperty()
-    duration = NumericProperty()
-    gradient_colors = ListProperty()
-
-
-class EditSubTaskDialogContent(BoxLayout):
-    pass
-
-
 class SubTaskList(BoxLayout):
     task = ObjectProperty()
+    selected = ObjectProperty()
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -1317,9 +1311,19 @@ class SubTaskList(BoxLayout):
 
         Clock.schedule_once(lambda x: self.setup())
 
+    def remove_sub_task(self):
+        if self.selected:
+            del self.task.sub_tasks[self.selected.name]
+            self.ids.sub_tasks_layout.remove_widget(self.selected)
+
+    def set_state(self):
+        if self.selected:
+            self.selected.done = not self.selected.done
+
     def setup(self):
-        for sub_task in self.task.sub_tasks:
-            self.ids.sub_tasks_layout.add_widget(SubTask(**sub_task))
+        for name, sub_task_data in self.task.sub_tasks.items():
+            self.ids.sub_tasks_layout.add_widget(
+                SubTask(sub_task_list=self, name=name, **sub_task_data))
 
     def open_add_dialog(self):
         color = self.app.theme_cls.primary_color
@@ -1335,12 +1339,13 @@ class SubTaskList(BoxLayout):
 
         def validate(*args):
             sub_task_data = {
-                'name': sub_task_edit_dialog.ids.name_field.text,
                 'duration': int(sub_task_edit_dialog.ids.duration_field.text),
-                'gradient_colors': self.task.gradient_colors
+                'assignments': [],
+                'done': False
             }
-            self.task.sub_tasks.append(sub_task_data)
-            self.ids.sub_tasks_layout.add_widget(SubTask(**sub_task_data))
+            self.task.sub_tasks[sub_task_edit_dialog.ids.name_field.text] = sub_task_data
+            self.ids.sub_tasks_layout.add_widget(
+                SubTask(sub_task_list=self, name=sub_task_edit_dialog.ids.name_field.text, **sub_task_data))
             dialog.dismiss()
 
         def discard(*args):
@@ -1350,6 +1355,71 @@ class SubTaskList(BoxLayout):
         discard_btn.bind(on_press=discard)
 
         dialog.open()
+
+
+class TaskItemDialogContent(BoxLayout):
+    task = ObjectProperty()
+
+
+class TaskItem(HorizontalGradientRectangle):
+    task = ObjectProperty()
+
+    def __init__(self, **kw):
+        super().__init__(**kw)
+        self.app = MDApp.get_running_app()
+
+        Clock.schedule_once(lambda x: self.setup())
+
+    def setup(self):
+        self.gradient_colors = self.task.get_state_gradient_colors()
+
+    def on_touch_down(self, touch):
+        if touch.is_double_tap and self.collide_point(*touch.pos):
+            content = TaskItemDialogContent(task=self.task)
+
+            def exit(*args):
+                self.ids.progress_bar.value = self.task.get_progression()
+                self.task.description = content.ids.description_input.text
+                sheetview.dismiss()
+
+            sheetview = DialogSheetView(
+                title='Sub tasks',
+                content=content,
+                buttons=[({'text': "EXIT"}, exit)],
+                size_hint=(0.9, 0.9))
+
+            sheetview.open()
+            return True
+        else:
+            return super().on_touch_down(touch)
+
+
+class SubTask(SelectionBehavior, HorizontalGradientRectangle):
+    name = StringProperty()
+    duration = NumericProperty()
+    sub_task_list = ObjectProperty()
+    assignments = ListProperty()
+    done = BooleanProperty(False)
+
+    def __init__(self, **kw):
+        super().__init__(**kw)
+
+        self.bind(done=self.update_state,
+                  assignments=self.update_assignments)
+
+    def on_select(self, *args):
+        self.sub_task_list.selected = self
+
+    def update_state(self, *args):
+        self.sub_task_list.task.sub_tasks[self.name]['done'] = self.done
+
+    def update_assignments(self, *args):
+        self.sub_task_list.task.sub_tasks[self.name]['assignments'] = self.assignments
+        self.sub_task_list.task.update_assignments()
+
+
+class EditSubTaskDialogContent(BoxLayout):
+    pass
 
 
 class BurndownChart(BoxLayout):
@@ -1675,7 +1745,7 @@ class TaskSpan(DiscreteMovableBehavior, RelativeLayout, TaskTooltiped):
                     self.x + (span + 1 / 2.0) * self.square_width,
                     self.y + self.square_height / 2.0
                 ],
-                         group="continue_arrow")
+                    group="continue_arrow")
 
     def draw_fixed_frame(self, *args):
         self.canvas.after.remove_group("fixed_frame")
@@ -1735,8 +1805,8 @@ class TaskSpan(DiscreteMovableBehavior, RelativeLayout, TaskTooltiped):
             sheetview = DialogSheetView(
                 title='Task treatment',
                 content=content,
-                on_validate=on_validate,
-                on_cancel=lambda x: sheetview.dismiss(),
+                buttons=[({'text': "OK"}, on_validate),
+                         ({'text': "CANCEL"}, lambda x: sheetview.dismiss())],
                 size_hint=(0.8, None),
                 height=200)
 
@@ -1906,8 +1976,8 @@ class ProjectListItem(OneLineAvatarIconListItem, RectangularRippleBehavior):
 
         sheetview = DialogSheetView(title='Duplicate the project',
                                     content=content,
-                                    on_validate=duplicate_file,
-                                    on_cancel=lambda x: sheetview.dismiss(),
+                                    buttons=[({'text': "OK"}, duplicate_file), ({
+                                        'text': "CANCEL"}, lambda x: sheetview.dismiss())],
                                     size_hint=(None, None),
                                     size=(500, 150))
         self.menu.dismiss()

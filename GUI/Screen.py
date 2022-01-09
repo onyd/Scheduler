@@ -38,8 +38,8 @@ class ProjectsListScreen(Screen):
 
         sheetview = DialogSheetView(title='Create new project',
                                     content=content,
-                                    on_validate=create_file,
-                                    on_cancel=lambda x: sheetview.dismiss(),
+                                    buttons=[({'text': "OK"}, create_file), ({
+                                        'text': "CANCEL"}, lambda x: sheetview.dismiss())],
                                     size_hint=(None, None),
                                     size=(500, 320))
 
@@ -279,8 +279,7 @@ class PlanningScreen(Screen):
                 on_press=lambda *args: self.force_gantt_dialog.dismiss())
 
             self.force_gantt_dialog = MDDialog(
-                text=
-                "It seems that the planning is unsolvable,  do you want to recompute in force mode (ie in progress tasks are authorized to be moved)",
+                text="It seems that the planning is unsolvable,  do you want to recompute in force mode (ie in progress tasks are authorized to be moved)",
                 buttons=[no_button, yes_button])
 
             self.app.manager.set_planning_state("unsolvable")

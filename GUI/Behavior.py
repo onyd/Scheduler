@@ -1,5 +1,4 @@
 from kivy.clock import Clock
-from kivy.event import EventDispatcher
 from kivy.metrics import sp
 from functools import partial
 
@@ -157,7 +156,66 @@ class DiscreteDragBehavior(object):
         touch.grab_current = None
 
 
-class DiscreteMovableBehavior(object):
+class SelectionBehavior(object):
+    selected = BooleanProperty(False)
+    selectable = BooleanProperty()
+    line_width = NumericProperty(4)
+    selection_frame_color = ColorProperty((0., 0., 0., 1.))
+
+    def __init__(self, **kwargs):
+        super(SelectionBehavior, self).__init__(**kwargs)
+        self.register_event_type('on_select')
+        self.register_event_type('on_unselect')
+
+        self.bind(selected=self.draw_selection_box,
+                  selection_frame_color=self.draw_selection_box,
+                  size=self.draw_selection_box,
+                  pos=self.draw_selection_box)
+        self.bind(selected=lambda instance,
+                  value: self.dispatch("on_select") if value else self.dispatch("on_unselect"))
+
+    def on_select(self, *args):
+        pass
+
+    def on_unselect(self, *args):
+        pass
+
+    def draw_selection_box(self, *args):
+        self.canvas.after.remove_group("selection_box")
+
+        if self.selected:
+            with self.canvas.after:
+                Color(*self.selection_frame_color)
+                Line(rectangle=(self.x - self.line_width, self.y - self.line_width,
+                                self.width + 2 * self.line_width, self.height + 2 * self.line_width),
+                     width=self.line_width,
+                     group="selection_box")
+
+    def on_touch_down(self, touch):
+        if touch.is_double_tap or (
+                'button' in touch.profile
+                and touch.button.startswith('scroll')):
+            return super(SelectionBehavior, self).on_touch_down(touch)
+
+        if not self.collide_point(*touch.pos):
+            self.selected = False
+
+        return super(SelectionBehavior, self).on_touch_down(touch)
+
+    def on_touch_up(self, touch):
+        if touch.is_double_tap or (
+                'button' in touch.profile
+                and touch.button.startswith('scroll')):
+            return super(SelectionBehavior, self).on_touch_down(touch)
+
+        x, y = touch.pos
+        if not self.selected and self.selectable and self.collide_point(x, y):
+            self.selected = True
+
+        return super(SelectionBehavior, self).on_touch_up(touch)
+
+
+class DiscreteMovableBehavior(SelectionBehavior):
     buttons_width = NumericProperty()
     buttons_height = NumericProperty()
     line_width = NumericProperty(2)
@@ -175,8 +233,6 @@ class DiscreteMovableBehavior(object):
 
     cursor_step = NumericProperty(1)
 
-    selected = BooleanProperty(False)
-
     def __init__(self, **kwargs):
         super(DiscreteMovableBehavior, self).__init__(**kwargs)
         self.register_event_type('on_move_left')
@@ -190,6 +246,12 @@ class DiscreteMovableBehavior(object):
 
     def on_move_right(self, step):
         pass
+
+    def on_select(self, *args):
+        return super().on_select(*args)
+
+    def on_unselect(self, *args):
+        return super().on_unselect(*args)
 
     def set_cursor(self, cursor_position):
         self.cursor_position = cursor_position
@@ -253,11 +315,7 @@ class DiscreteMovableBehavior(object):
         elif self.selected and self.collide_button(x, y, right=False):
             return True
 
-        if not self.collide_point(*touch.pos):
-            self.selected = False
-            return super(DiscreteMovableBehavior, self).on_touch_down(touch)
-
-        return True
+        return super(DiscreteMovableBehavior, self).on_touch_down(touch)
 
     def collide_button(self, x, y, right):
         if right:
@@ -282,10 +340,7 @@ class DiscreteMovableBehavior(object):
                     self.show_y = self.center_y - self.buttons_height / 2.0
                 else:
                     self.show_y = y - self.buttons_height / 2.0
-                self.selected = True
-                return True
-            else:
-                return super(DiscreteMovableBehavior, self).on_touch_up(touch)
+            return super(DiscreteMovableBehavior, self).on_touch_up(touch)
         else:
             if self.collide_button(
                     x, y, right=True
@@ -307,7 +362,7 @@ class DiscreteMovableBehavior(object):
         return super(DiscreteMovableBehavior, self).on_touch_up(touch)
 
 
-class SelectDragBehavior(object):
+class SelectDragBehavior(SelectionBehavior):
     """This class is an adaptation of the DragBehavior class from kivy with selection feature"""
     drag_distance = NumericProperty(6)
 
@@ -319,39 +374,21 @@ class SelectDragBehavior(object):
     drag_rectangle = ReferenceListProperty(drag_rect_x, drag_rect_y,
                                            drag_rect_width, drag_rect_height)
     collision_margin = NumericProperty(3)
-    selection_frame_color = ColorProperty((0., 0., 0., 1.))
+    sdb_enabled = BooleanProperty(True)
 
     def __init__(self, **kwargs):
         self._drag_touch = None
-        self.selected = False
-        self.sdb_enabled = True
 
         super(SelectDragBehavior, self).__init__(**kwargs)
 
         self.bind(size=lambda *args: self.draw_selection_box())
+        self.bind(sdb_enabled=self.setter('selectable'))
 
     def _get_uid(self, prefix='sv'):
         return '{0}.{1}'.format(prefix, self.uid)
 
-    def select(self):
-        self.selected = True
-        self.draw_selection_box()
-
-    def unselect(self):
-        self.selected = False
-        self.canvas.remove_group("selection_box")
+    def on_unselect(self, *args):
         self._drag_touch = None
-
-    def draw_selection_box(self, line_width=4):
-        if not self.selected:
-            return
-        self.canvas.remove_group("selection_box")
-        with self.canvas:
-            Color(*self.selection_frame_color)
-            Line(rectangle=(self.x - line_width, self.y - line_width,
-                            self.width + 2 * line_width, self.height + 2 * line_width),
-                 width=line_width,
-                 group="selection_box")
 
     def handle_collisions(self, dx=0, dy=0):
         new_dx, new_dy = dx, dy
@@ -395,7 +432,6 @@ class SelectDragBehavior(object):
         x, y = touch.pos
 
         if not self.collide_point(x, y):
-            self.unselect()
             touch.ud[self._get_uid('svavoid')] = True
             return super(SelectDragBehavior, self).on_touch_down(touch)
 
@@ -404,7 +440,7 @@ class SelectDragBehavior(object):
                 not ((xx < x <= xx + w) and (yy < y <= yy + h)):
             return super(SelectDragBehavior, self).on_touch_down(touch)
 
-        # no mouse scrolling and object is selected, so the user is going to drag with this touch.
+        # no mouse scrolling, so the user is going to drag with this touch.
         touch.grab(self)
         uid = self._get_uid()
         touch.ud[uid] = {'mode': 'unknown', 'dx': 0, 'dy': 0}
@@ -448,7 +484,6 @@ class SelectDragBehavior(object):
             self.x += dx
             self.y += dy
 
-        self.draw_selection_box()
         return True
 
     def on_touch_up(self, touch):
@@ -462,11 +497,9 @@ class SelectDragBehavior(object):
 
             if self.collide_point(
                     x, y) and not self.selected and ud['mode'] != 'drag':
-                self.select()
-                return True
+                return super(SelectDragBehavior, self).on_touch_up(touch)
 
             self.handle_collisions()
-            self.draw_selection_box()
 
             # avoid the drag if touch doesn't correspond
             if self._get_uid('svavoid') in touch.ud:
